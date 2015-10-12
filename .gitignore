@@ -1,0 +1,3 @@
+create-diff-object
+*.o
+*.d

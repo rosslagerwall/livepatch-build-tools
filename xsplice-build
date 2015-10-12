@@ -1,0 +1,252 @@
+#!/bin/bash
+#
+# xsplice build script
+#
+# Copyright (C) 2014 Seth Jennings <sjenning@redhat.com>
+# Copyright (C) 2013,2014 Josh Poimboeuf <jpoimboe@redhat.com>
+# Copyright (C) 2015 Ross Lagerwall <ross.lagerwall@citrix.com>
+#
+# This program is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License
+# as published by the Free Software Foundation; either version 2
+# of the License, or (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+# This script takes a Xen tree, and a patch and outputs an xsplice
+# module intended to patch Xen at runtime.
+# Large amounts of this script are taken from kpatch's kpatch-build
+# script.
+
+SCRIPTDIR="$(readlink -f $(dirname $(type -p $0)))"
+CPUS="$(getconf _NPROCESSORS_ONLN)"
+DEBUG=n
+XEN_DEBUG=n
+SKIP=
+
+warn() {
+    echo "ERROR: $1" >&2
+}
+
+die() {
+    if [[ -z $1 ]]; then
+        msg="xSplice build failed"
+    else
+        msg="$1"
+    fi
+
+    warn "$msg."
+
+    exit 1
+}
+
+function make_patch_name()
+{
+    PATCHNAME=$(basename "$1")
+    if [[ "$PATCHNAME" =~ \.patch ]] || [[ "$PATCHNAME" =~ \.diff ]]; then
+            PATCHNAME="${PATCHNAME%.*}"
+    fi
+
+    # Only allow alphanumerics and '_' and '-' in the patch name.  Everything
+    # else is replaced with '-'.  Truncate to 48 chars.
+    echo ${PATCHNAME//[^a-zA-Z0-9_-]/-} |cut -c 1-48
+}
+
+# Do a full normal build
+function build_full()
+{
+    cd "${SRCDIR}/xen" || die
+    make "-j$CPUS" clean &> "${OUTPUT}/build_full_clean.log" || die
+    make "-j$CPUS" debug="$XEN_DEBUG" &> "${OUTPUT}/build_full_compile.log" || die
+    cp xen-syms "$OUTPUT"
+}
+
+# Build with special GCC flags
+function build_special()
+{
+    name=$1
+
+    cd "${SRCDIR}" || die
+
+    # Capture .o files from the patched build
+    export CROSS_COMPILE="${SCRIPTDIR}/xsplice-gcc "
+    export XSPLICE_BUILD_DIR="$(pwd)/"
+    export XSPLICE_CAPTURE_DIR="$OUTPUT/${name}"
+    mkdir -p "$XSPLICE_CAPTURE_DIR"
+
+    # Build with special GCC flags
+    cd "${SRCDIR}/xen" || die
+    sed -i 's/CFLAGS += -nostdinc/CFLAGS += -nostdinc -ffunction-sections -fdata-sections/' Rules.mk
+    make "-j$CPUS" debug="$XEN_DEBUG" &> "${OUTPUT}/build_${name}_compile.log" || die
+    sed -i 's/CFLAGS += -nostdinc -ffunction-sections -fdata-sections/CFLAGS += -nostdinc/' Rules.mk
+
+    unset XSPLICE_BUILD_DIR
+    unset XSPLICE_CAPTURE_DIR
+}
+
+function create_patch()
+{
+    echo "Extracting new and modified ELF sections..."
+
+    [[ -e "${OUTPUT}/original/changed_objs" ]] || die "no changed objects found"
+    [[ -e "${OUTPUT}/patched/changed_objs" ]] || die "no changed objects found"
+
+    cd "${OUTPUT}/original" || die
+    FILES="$(find xen -type f -name "*.o")"
+    cd "${OUTPUT}" || die
+    CHANGED=0
+    ERROR=0
+    debugopt=
+    [[ $DEBUG -eq 1 ]] && debugopt=-d
+
+    for i in $FILES; do
+        mkdir -p "output/$(dirname $i)" || die
+        echo "Processing ${i}"
+        echo "Run create-diff-object on $i" >> "${OUTPUT}/create-diff-object.log"
+        "${SCRIPTDIR}"/create-diff-object $debugopt "original/$i" "patched/$i" xen-syms "output/$i" &>> "${OUTPUT}/create-diff-object.log"
+        rc="${PIPESTATUS[0]}"
+        if [[ $rc = 139 ]]; then
+            warn "create-diff-object SIGSEGV"
+            if ls core* &> /dev/null; then
+                cp core* /tmp
+                die "core file at /tmp/$(ls core*)"
+            fi
+            die "no core file found, run 'ulimit -c unlimited' and try to recreate"
+        fi
+        # create-diff-object returns 3 if no functional change is found
+        [[ $rc -eq 0 ]] || [[ $rc -eq 3 ]] || ERROR=$(expr $ERROR "+" 1)
+        if [[ $rc -eq 0 ]]; then
+            CHANGED=1
+        fi
+    done
+
+    if [[ $ERROR -ne 0 ]]; then
+        die "$ERROR error(s) encountered"
+    fi
+
+    if [[ $CHANGED -eq 0 ]]; then
+        die "no functional changes found"
+    fi
+
+    echo "Creating patch module..."
+    ld -r -o "${PATCHNAME}.xsplice" $(find output -type f -name "*.o") || die
+}
+
+usage() {
+	echo "usage: $(basename $0) [options]" >&2
+	echo "		-h, --help	   Show this help message" >&2
+	echo "		-s, --srcdir	   Xen source directory" >&2
+	echo "		-p, --patch	   Patch file" >&2
+	echo "		-o, --output	   Output directory" >&2
+	echo "		-j, --cpus	   Number of CPUs to use" >&2
+	echo "		-k, --skip	   Skip build or diff phase" >&2
+	echo "		-d, --debug	   Enable debug logging" >&2
+	echo "		--xen-debug	   Build debug Xen" >&2
+}
+
+options=$(getopt -o hs:p:o:j:k:d -l "help,srcdir:patch:output:cpus:,skip:,debug,xen-debug" -- "$@") || die "getopt failed"
+
+eval set -- "$options"
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        -h|--help)
+            usage
+            exit 0
+            ;;
+        -j|--cpus)
+            shift
+            CPUS="$1"
+            shift
+            ;;
+        -k|--skip)
+            shift
+            SKIP="$1"
+            shift
+            ;;
+        -d|--debug)
+            DEBUG=1
+            shift
+            ;;
+        --xen-debug)
+            XEN_DEBUG=y
+            shift
+            ;;
+        -s|--srcdir)
+            shift
+            srcarg="$1"
+            shift
+            ;;
+        -p|--patch)
+            shift
+            patcharg="$1"
+            shift
+            ;;
+        -o|--output)
+            shift
+            outputarg="$1"
+            shift
+            ;;
+        --)
+            shift
+            break
+            ;;
+    esac
+done
+
+[ -z "$srcarg" ] && die "Xen directory not given"
+[ -z "$patcharg" ] && die "Patchfile not given"
+[ -z "$outputarg" ] && die "Output directory not given"
+
+SRCDIR="$(realpath -m -- "$srcarg")"
+PATCHFILE="$(realpath -m -- "$patcharg")"
+OUTPUT="$(realpath -m -- "$outputarg")"
+
+[ -d "${SRCDIR}" ] || die "Xen directory does not exist"
+[ -f "${PATCHFILE}" ] || die "Patchfile does not exist"
+
+PATCHNAME=$(make_patch_name "${PATCHFILE}")
+
+echo "Building xSplice patch: ${PATCHNAME}"
+echo
+echo "Xen directory: ${SRCDIR}"
+echo "Patch file: ${PATCHFILE}"
+echo "Output directory: ${OUTPUT}"
+echo "================================================"
+echo
+
+if [ "${SKIP}" != "build" ]; then
+    [ -e "${OUTPUT}" ] && die "Output directory exists"
+    mkdir -p "${OUTPUT}" || die
+
+    echo "Testing patch file..."
+    cd "$SRCDIR" || die
+    patch -s -N -p1 --dry-run < "$PATCHFILE" || die "source patch file failed to apply"
+
+    echo "Perform full initial build with ${CPUS} CPU(s)..."
+    build_full
+
+    echo "Apply patch and build with ${CPUS} CPU(s)..."
+    cd "$SRCDIR" || die
+    patch -s -N -p1 < "$PATCHFILE" || die
+    build_special original
+
+    echo "Unapply patch and build with ${CPUS} CPU(s)..."
+    cd "$SRCDIR" || die
+    patch -s -R -p1 < "$PATCHFILE" || die
+    build_special patched
+fi
+
+if [ "${SKIP}" != "diff" ]; then
+    [ -d "${OUTPUT}" ] || die "Output directory does not exist"
+
+    cd "${OUTPUT}" || die
+    create_patch
+    echo "${PATCHNAME}.xsplice created successfully"
+fi
