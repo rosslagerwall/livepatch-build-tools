@@ -235,12 +235,12 @@ if [ "${SKIP}" != "build" ]; then
     echo "Apply patch and build with ${CPUS} CPU(s)..."
     cd "$SRCDIR" || die
     patch -s -N -p1 < "$PATCHFILE" || die
-    build_special original
+    build_special patched
 
     echo "Unapply patch and build with ${CPUS} CPU(s)..."
     cd "$SRCDIR" || die
     patch -s -R -p1 < "$PATCHFILE" || die
-    build_special patched
+    build_special original
 fi
 
 if [ "${SKIP}" != "diff" ]; then
