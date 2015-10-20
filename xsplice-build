@@ -29,6 +29,7 @@ CPUS="$(getconf _NPROCESSORS_ONLN)"
 DEBUG=n
 XEN_DEBUG=n
 SKIP=
+XENSYMS=xen-syms
 
 warn() {
     echo "ERROR: $1" >&2
@@ -109,7 +110,7 @@ function create_patch()
         mkdir -p "output/$(dirname $i)" || die
         echo "Processing ${i}"
         echo "Run create-diff-object on $i" >> "${OUTPUT}/create-diff-object.log"
-        "${SCRIPTDIR}"/create-diff-object $debugopt "original/$i" "patched/$i" xen-syms "output/$i" &>> "${OUTPUT}/create-diff-object.log"
+        "${SCRIPTDIR}"/create-diff-object $debugopt "original/$i" "patched/$i" "$XENSYMS" "output/$i" &>> "${OUTPUT}/create-diff-object.log"
         rc="${PIPESTATUS[0]}"
         if [[ $rc = 139 ]]; then
             warn "create-diff-object SIGSEGV"
@@ -148,9 +149,10 @@ usage() {
 	echo "		-k, --skip	   Skip build or diff phase" >&2
 	echo "		-d, --debug	   Enable debug logging" >&2
 	echo "		--xen-debug	   Build debug Xen" >&2
+	echo "		--xen-syms	   Build against a xen-syms" >&2
 }
 
-options=$(getopt -o hs:p:o:j:k:d -l "help,srcdir:patch:output:cpus:,skip:,debug,xen-debug" -- "$@") || die "getopt failed"
+options=$(getopt -o hs:p:o:j:k:d -l "help,srcdir:patch:output:cpus:,skip:,debug,xen-debug,xen-syms:" -- "$@") || die "getopt failed"
 
 eval set -- "$options"
 
@@ -191,6 +193,12 @@ while [[ $# -gt 0 ]]; do
         -o|--output)
             shift
             outputarg="$1"
+            shift
+            ;;
+        --xen-syms)
+            shift
+            XENSYMS="$(realpath -m -- "$1")"
+            [ -f "$XENSYMS" ] || die "xen-syms file does not exist"
             shift
             ;;
         --)
