@@ -160,6 +160,7 @@ struct xsplice_patch_func {
 	unsigned long old_addr;
 	unsigned long old_size;
 	char *name;
+	unsigned char undo[8];
 };
 
 struct special_section {
@@ -2000,6 +2001,7 @@ void xsplice_create_patches_sections(struct xsplice_elf *kelf,
 			funcs[index].old_size = result.size;
 			funcs[index].new_addr = 0;
 			funcs[index].new_size = sym->sym.st_size;
+			memset(funcs[index].undo, 0, sizeof funcs[index].undo);
 
 			/*
 			 * Add a relocation that will populate
