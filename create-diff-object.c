@@ -69,7 +69,7 @@
 		printf(format, ##__VA_ARGS__); \
 })
 
-char *childobj;
+static char *childobj;
 
 enum loglevel {
 	DEBUG,
@@ -172,7 +172,7 @@ struct special_section {
  * Helper functions
  ******************/
 
-char *status_str(enum status status)
+static char *status_str(enum status status)
 {
 	switch(status) {
 	case NEW:
@@ -188,18 +188,18 @@ char *status_str(enum status status)
 	return NULL;
 }
 
-int is_rela_section(struct section *sec)
+static int is_rela_section(struct section *sec)
 {
 	return (sec->sh.sh_type == SHT_RELA);
 }
 
-int is_text_section(struct section *sec)
+static int is_text_section(struct section *sec)
 {
 	return (sec->sh.sh_type == SHT_PROGBITS &&
 		(sec->sh.sh_flags & SHF_EXECINSTR));
 }
 
-int is_debug_section(struct section *sec)
+static int is_debug_section(struct section *sec)
 {
 	char *name;
 	if (is_rela_section(sec))
@@ -209,7 +209,8 @@ int is_debug_section(struct section *sec)
 	return !strncmp(name, ".debug_", 7);
 }
 
-struct section *find_section_by_index(struct list_head *list, unsigned int index)
+static struct section *find_section_by_index(struct list_head *list,
+					     unsigned int index)
 {
 	struct section *sec;
 
@@ -220,7 +221,8 @@ struct section *find_section_by_index(struct list_head *list, unsigned int index
 	return NULL;
 }
 
-struct section *find_section_by_name(struct list_head *list, const char *name)
+static struct section *find_section_by_name(struct list_head *list,
+		                            const char *name)
 {
 	struct section *sec;
 
@@ -231,7 +233,8 @@ struct section *find_section_by_name(struct list_head *list, const char *name)
 	return NULL;
 }
 
-struct symbol *find_symbol_by_index(struct list_head *list, size_t index)
+static struct symbol *find_symbol_by_index(struct list_head *list,
+					   size_t index)
 {
 	struct symbol *sym;
 
@@ -242,7 +245,8 @@ struct symbol *find_symbol_by_index(struct list_head *list, size_t index)
 	return NULL;
 }
 
-struct symbol *find_symbol_by_name(struct list_head *list, const char *name)
+static struct symbol *find_symbol_by_name(struct list_head *list,
+					  const char *name)
 {
 	struct symbol *sym;
 
@@ -264,7 +268,7 @@ struct symbol *find_symbol_by_name(struct list_head *list, const char *name)
 }
 
 /* returns the offset of the string in the string table */
-int offset_of_string(struct list_head *list, char *name)
+static int offset_of_string(struct list_head *list, char *name)
 {
 	struct string *string;
 	int index = 0;
@@ -282,7 +286,8 @@ int offset_of_string(struct list_head *list, char *name)
 	return index;
 }
 
-void rela_insn(struct section *sec, struct rela *rela, struct insn *insn)
+static void rela_insn(struct section *sec, struct rela *rela,
+		      struct insn *insn)
 {
 	unsigned long insn_addr, start, end, rela_addr;
 
@@ -304,7 +309,8 @@ void rela_insn(struct section *sec, struct rela *rela, struct insn *insn)
 /*************
  * Functions
  * **********/
-void xsplice_create_rela_list(struct xsplice_elf *kelf, struct section *sec)
+static void xsplice_create_rela_list(struct xsplice_elf *kelf,
+				     struct section *sec)
 {
 	int rela_nr, index = 0, skip = 0;
 	struct rela *rela;
@@ -317,7 +323,7 @@ void xsplice_create_rela_list(struct xsplice_elf *kelf, struct section *sec)
 
 	/* create reverse link from base section to this rela section */
 	sec->base->rela = sec;
-		
+
 	rela_nr = sec->sh.sh_size / sec->sh.sh_entsize;
 
 	log_debug("\n=== rela list for %s (%d entries) ===\n",
@@ -388,7 +394,7 @@ void xsplice_create_rela_list(struct xsplice_elf *kelf, struct section *sec)
 	}
 }
 
-void xsplice_create_section_list(struct xsplice_elf *kelf)
+static void xsplice_create_section_list(struct xsplice_elf *kelf)
 {
 	Elf_Scn *scn = NULL;
 	struct section *sec;
@@ -438,7 +444,7 @@ void xsplice_create_section_list(struct xsplice_elf *kelf)
 		ERROR("expected NULL");
 }
 
-int is_bundleable(struct symbol *sym)
+static int is_bundleable(struct symbol *sym)
 {
 	if (sym->type == STT_FUNC &&
 	    !strncmp(sym->sec->name, ".text.",6) &&
@@ -468,7 +474,7 @@ int is_bundleable(struct symbol *sym)
 	return 0;
 }
 
-void xsplice_create_symbol_list(struct xsplice_elf *kelf)
+static void xsplice_create_symbol_list(struct xsplice_elf *kelf)
 {
 	struct section *symtab;
 	struct symbol *sym;
@@ -528,7 +534,7 @@ void xsplice_create_symbol_list(struct xsplice_elf *kelf)
 
 }
 
-struct xsplice_elf *xsplice_elf_open(const char *name)
+static struct xsplice_elf *xsplice_elf_open(const char *name)
 {
 	Elf *elf;
 	int fd;
@@ -568,7 +574,7 @@ struct xsplice_elf *xsplice_elf_open(const char *name)
 	return kelf;
 }
 
-void xsplice_compare_elf_headers(Elf *elf1, Elf *elf2)
+static void xsplice_compare_elf_headers(Elf *elf1, Elf *elf2)
 {
 	GElf_Ehdr eh1, eh2;
 
@@ -591,7 +597,7 @@ void xsplice_compare_elf_headers(Elf *elf1, Elf *elf2)
 		DIFF_FATAL("ELF headers differ");
 }
 
-void xsplice_check_program_headers(Elf *elf)
+static void xsplice_check_program_headers(Elf *elf)
 {
 	size_t ph_nr;
 
@@ -602,7 +608,7 @@ void xsplice_check_program_headers(Elf *elf)
 		DIFF_FATAL("ELF contains program header");
 }
 
-void xsplice_mark_grouped_sections(struct xsplice_elf *kelf)
+static void xsplice_mark_grouped_sections(struct xsplice_elf *kelf)
 {
 	struct section *groupsec, *sec;
 	unsigned int *data, *end;
@@ -632,7 +638,7 @@ void xsplice_mark_grouped_sections(struct xsplice_elf *kelf)
  * section symbol in this case so that the relas can be properly correlated and
  * so that the existing object/function in vmlinux can be linked to.
  */
-void xsplice_replace_sections_syms(struct xsplice_elf *kelf)
+static void xsplice_replace_sections_syms(struct xsplice_elf *kelf)
 {
 	struct section *sec;
 	struct rela *rela;
@@ -736,8 +742,8 @@ static int xsplice_mangled_strcmp(char *s1, char *s2)
  * with a different trailing number.  Rename any mangled patched functions to
  * match their base counterparts.
  */
-void xsplice_rename_mangled_functions(struct xsplice_elf *base,
-				     struct xsplice_elf *patched)
+static void xsplice_rename_mangled_functions(struct xsplice_elf *base,
+				             struct xsplice_elf *patched)
 {
 	struct symbol *sym, *basesym;
 	char name[256], *origname;
@@ -862,7 +868,8 @@ static int is_constant_label(struct symbol *sym)
 	return 1;
 }
 
-void xsplice_correlate_sections(struct list_head *seclist1, struct list_head *seclist2)
+static void xsplice_correlate_sections(struct list_head *seclist1,
+				       struct list_head *seclist2)
 {
 	struct section *sec1, *sec2;
 
@@ -897,7 +904,8 @@ void xsplice_correlate_sections(struct list_head *seclist1, struct list_head *se
 	}
 }
 
-void xsplice_correlate_symbols(struct list_head *symlist1, struct list_head *symlist2)
+static void xsplice_correlate_symbols(struct list_head *symlist1,
+				      struct list_head *symlist2)
 {
 	struct symbol *sym1, *sym2;
 
@@ -929,7 +937,8 @@ void xsplice_correlate_symbols(struct list_head *symlist1, struct list_head *sym
 	}
 }
 
-void xsplice_correlate_elfs(struct xsplice_elf *kelf1, struct xsplice_elf *kelf2)
+static void xsplice_correlate_elfs(struct xsplice_elf *kelf1,
+				   struct xsplice_elf *kelf2)
 {
 	xsplice_correlate_sections(&kelf1->sections, &kelf2->sections);
 	xsplice_correlate_symbols(&kelf1->symbols, &kelf2->symbols);
@@ -948,7 +957,7 @@ static char *xsplice_section_function_name(struct section *sec)
  * in the base object.
  */
 static struct symbol *xsplice_find_static_twin(struct section *sec,
-					      struct symbol *sym)
+					       struct symbol *sym)
 {
 	struct rela *rela;
 	struct symbol *basesym;
@@ -993,8 +1002,8 @@ static struct symbol *xsplice_find_static_twin(struct section *sec,
  * can arbitrarily change.  Try to rename the patched version of the symbol to
  * match the base version and then correlate them.
  */
-void xsplice_correlate_static_local_variables(struct xsplice_elf *base,
-					     struct xsplice_elf *patched)
+static void xsplice_correlate_static_local_variables(struct xsplice_elf *base,
+					             struct xsplice_elf *patched)
 {
 	struct symbol *sym, *basesym, *tmpsym;
 	struct section *tmpsec, *sec;
@@ -1078,7 +1087,7 @@ void xsplice_correlate_static_local_variables(struct xsplice_elf *base,
 	}
 }
 
-int rela_equal(struct rela *rela1, struct rela *rela2)
+static int rela_equal(struct rela *rela1, struct rela *rela2)
 {
 	log_debug("Comparing rela %s with %s\n", rela1->sym->name, rela2->sym->name);
 	if (rela1->type != rela2->type ||
@@ -1101,7 +1110,7 @@ int rela_equal(struct rela *rela1, struct rela *rela2)
 	return !strcmp(rela1->sym->name, rela2->sym->name);
 }
 
-void xsplice_compare_correlated_rela_section(struct section *sec)
+static void xsplice_compare_correlated_rela_section(struct section *sec)
 {
 	struct rela *rela1, *rela2 = NULL;
 
@@ -1118,7 +1127,7 @@ void xsplice_compare_correlated_rela_section(struct section *sec)
 	sec->status = SAME;
 }
 
-void xsplice_compare_correlated_nonrela_section(struct section *sec)
+static void xsplice_compare_correlated_nonrela_section(struct section *sec)
 {
 	struct section *sec1 = sec, *sec2 = sec->twin;
 
@@ -1129,7 +1138,7 @@ void xsplice_compare_correlated_nonrela_section(struct section *sec)
 		sec->status = SAME;
 }
 
-void xsplice_compare_correlated_section(struct section *sec)
+static void xsplice_compare_correlated_section(struct section *sec)
 {
 	struct section *sec1 = sec, *sec2 = sec->twin;
 
@@ -1158,7 +1167,7 @@ out:
 		log_debug("section %s has changed\n", sec->name);
 }
 
-void xsplice_compare_sections(struct list_head *seclist)
+static void xsplice_compare_sections(struct list_head *seclist)
 {
 	struct section *sec;
 
@@ -1182,7 +1191,7 @@ void xsplice_compare_sections(struct list_head *seclist)
 	}
 }
 
-void xsplice_compare_correlated_symbol(struct symbol *sym)
+static void xsplice_compare_correlated_symbol(struct symbol *sym)
 {
 	struct symbol *sym1 = sym, *sym2 = sym->twin;
 
@@ -1218,7 +1227,7 @@ void xsplice_compare_correlated_symbol(struct symbol *sym)
 	 */
 }
 
-void xsplice_compare_symbols(struct list_head *symlist)
+static void xsplice_compare_symbols(struct list_head *symlist)
 {
 	struct symbol *sym;
 
@@ -1232,7 +1241,7 @@ void xsplice_compare_symbols(struct list_head *symlist)
 	}
 }
 
-void xsplice_compare_correlated_elements(struct xsplice_elf *kelf)
+static void xsplice_compare_correlated_elements(struct xsplice_elf *kelf)
 {
 	/* lists are already correlated at this point */
 	log_debug("Compare sections\n");
@@ -1248,7 +1257,7 @@ void xsplice_compare_correlated_elements(struct xsplice_elf *kelf)
  * help cause an immediate and obvious issue when a logic error leads to
  * accessing data that is not intended to be accessed past a particular point.
  */
-void xsplice_elf_teardown(struct xsplice_elf *kelf)
+static void xsplice_elf_teardown(struct xsplice_elf *kelf)
 {
 	struct section *sec, *safesec;
 	struct symbol *sym, *safesym;
@@ -1274,7 +1283,7 @@ void xsplice_elf_teardown(struct xsplice_elf *kelf)
 	INIT_LIST_HEAD(&kelf->symbols);
 }
 
-void xsplice_elf_free(struct xsplice_elf *kelf)
+static void xsplice_elf_free(struct xsplice_elf *kelf)
 {
 	elf_end(kelf->elf);
 	close(kelf->fd);
@@ -1282,7 +1291,7 @@ void xsplice_elf_free(struct xsplice_elf *kelf)
 	free(kelf);
 }
 
-void xsplice_mark_ignored_sections_same(struct xsplice_elf *kelf)
+static void xsplice_mark_ignored_sections_same(struct xsplice_elf *kelf)
 {
 	struct section *sec;
 	struct symbol *sym;
@@ -1303,7 +1312,7 @@ void xsplice_mark_ignored_sections_same(struct xsplice_elf *kelf)
 	}
 }
 
-void xsplice_mark_constant_labels_same(struct xsplice_elf *kelf)
+static void xsplice_mark_constant_labels_same(struct xsplice_elf *kelf)
 {
 	struct symbol *sym;
 
@@ -1313,19 +1322,19 @@ void xsplice_mark_constant_labels_same(struct xsplice_elf *kelf)
 	}
 }
 
-int bug_frames_0_group_size(struct xsplice_elf *kelf, int offset) { return 8; }
-int bug_frames_1_group_size(struct xsplice_elf *kelf, int offset) { return 8; }
-int bug_frames_2_group_size(struct xsplice_elf *kelf, int offset) { return 8; }
-int bug_frames_3_group_size(struct xsplice_elf *kelf, int offset) { return 16; }
-int ex_table_group_size(struct xsplice_elf *kelf, int offset) { return 8; }
-int altinstructions_group_size(struct xsplice_elf *kelf, int offset) { return 12; }
+static int bug_frames_0_group_size(struct xsplice_elf *kelf, int offset) { return 8; }
+static int bug_frames_1_group_size(struct xsplice_elf *kelf, int offset) { return 8; }
+static int bug_frames_2_group_size(struct xsplice_elf *kelf, int offset) { return 8; }
+static int bug_frames_3_group_size(struct xsplice_elf *kelf, int offset) { return 16; }
+static int ex_table_group_size(struct xsplice_elf *kelf, int offset) { return 8; }
+static int altinstructions_group_size(struct xsplice_elf *kelf, int offset) { return 12; }
 
 /*
  * The rela groups in the .fixup section vary in size.  The beginning of each
  * .fixup rela group is referenced by the .ex_table section. To find the size
  * of a .fixup rela group, we have to traverse the .ex_table relas.
  */
-int fixup_group_size(struct xsplice_elf *kelf, int offset)
+static int fixup_group_size(struct xsplice_elf *kelf, int offset)
 {
 	struct section *sec;
 	struct rela *rela;
@@ -1368,7 +1377,7 @@ int fixup_group_size(struct xsplice_elf *kelf, int offset)
 	return rela->addend - offset;
 }
 
-struct special_section special_sections[] = {
+static struct special_section special_sections[] = {
 	{
 		.name		= ".bug_frames.0",
 		.group_size	= bug_frames_0_group_size,
@@ -1400,7 +1409,7 @@ struct special_section special_sections[] = {
 	{},
 };
 
-int should_keep_rela_group(struct section *sec, int start, int size)
+static int should_keep_rela_group(struct section *sec, int start, int size)
 {
 	struct rela *rela;
 	int found = 0;
@@ -1420,9 +1429,9 @@ int should_keep_rela_group(struct section *sec, int start, int size)
 	return found;
 }
 
-void xsplice_regenerate_special_section(struct xsplice_elf *kelf,
-				       struct special_section *special,
-				       struct section *sec)
+static void xsplice_regenerate_special_section(struct xsplice_elf *kelf,
+				               struct special_section *special,
+				               struct section *sec)
 {
 	struct rela *rela, *safe;
 	char *src, *dest;
@@ -1502,7 +1511,7 @@ void xsplice_regenerate_special_section(struct xsplice_elf *kelf,
 	sec->base->data->d_size = dest_offset;
 }
 
-void xsplice_process_special_sections(struct xsplice_elf *kelf)
+static void xsplice_process_special_sections(struct xsplice_elf *kelf)
 {
 	struct special_section *special;
 	struct section *sec;
@@ -1547,7 +1556,7 @@ void xsplice_process_special_sections(struct xsplice_elf *kelf)
 	}
 }
 
-void xsplice_include_standard_elements(struct xsplice_elf *kelf)
+static void xsplice_include_standard_elements(struct xsplice_elf *kelf)
 {
 	struct section *sec;
 
@@ -1570,7 +1579,7 @@ void xsplice_include_standard_elements(struct xsplice_elf *kelf)
 #define inc_printf(fmt, ...) \
 	log_debug("%*s" fmt, recurselevel, "", ##__VA_ARGS__);
 
-void xsplice_include_symbol(struct symbol *sym, int recurselevel)
+static void xsplice_include_symbol(struct symbol *sym, int recurselevel)
 {
 	struct rela *rela;
 	struct section *sec;
@@ -1604,7 +1613,7 @@ out:
 	return;
 }
 
-int xsplice_include_changed_functions(struct xsplice_elf *kelf)
+static int xsplice_include_changed_functions(struct xsplice_elf *kelf)
 {
 	struct symbol *sym;
 	int changed_nr = 0;
@@ -1625,7 +1634,7 @@ int xsplice_include_changed_functions(struct xsplice_elf *kelf)
 	return changed_nr;
 }
 
-void xsplice_include_debug_sections(struct xsplice_elf *kelf)
+static void xsplice_include_debug_sections(struct xsplice_elf *kelf)
 {
 	struct section *sec;
 	struct rela *rela, *saferela;
@@ -1652,7 +1661,7 @@ void xsplice_include_debug_sections(struct xsplice_elf *kelf)
 	}
 }
 
-int xsplice_include_new_globals(struct xsplice_elf *kelf)
+static int xsplice_include_new_globals(struct xsplice_elf *kelf)
 {
 	struct symbol *sym;
 	int nr = 0;
@@ -1668,7 +1677,7 @@ int xsplice_include_new_globals(struct xsplice_elf *kelf)
 	return nr;
 }
 
-void xsplice_print_changes(struct xsplice_elf *kelf)
+static void xsplice_print_changes(struct xsplice_elf *kelf)
 {
 	struct symbol *sym;
 
@@ -1682,7 +1691,7 @@ void xsplice_print_changes(struct xsplice_elf *kelf)
 	}
 }
 
-void xsplice_dump_kelf(struct xsplice_elf *kelf)
+static void xsplice_dump_kelf(struct xsplice_elf *kelf)
 {
 	struct section *sec;
 	struct symbol *sym;
@@ -1730,7 +1739,7 @@ next:
 	}
 }
 
-void xsplice_verify_patchability(struct xsplice_elf *kelf)
+static void xsplice_verify_patchability(struct xsplice_elf *kelf)
 {
 	struct section *sec;
 	int errs = 0;
@@ -1771,7 +1780,8 @@ void xsplice_verify_patchability(struct xsplice_elf *kelf)
 		DIFF_FATAL("%d unsupported section change(s)", errs);
 }
 
-void xsplice_migrate_included_elements(struct xsplice_elf *kelf, struct xsplice_elf **kelfout)
+static void xsplice_migrate_included_elements(struct xsplice_elf *kelf,
+					      struct xsplice_elf **kelfout)
 {
 	struct section *sec, *safesec;
 	struct symbol *sym, *safesym;
@@ -1809,15 +1819,14 @@ void xsplice_migrate_included_elements(struct xsplice_elf *kelf, struct xsplice_
 		if (sym->sec && !sym->sec->include)
 			/* break link to non-included section */
 			sym->sec = NULL;
-			
 	}
 
 	*kelfout = out;
 }
 
-void xsplice_migrate_symbols(struct list_head *src,
-                                    struct list_head *dst,
-                                    int (*select)(struct symbol *))
+static void xsplice_migrate_symbols(struct list_head *src,
+				    struct list_head *dst,
+				    int (*select)(struct symbol *))
 {
 	struct symbol *sym, *safe;
 
@@ -1830,7 +1839,7 @@ void xsplice_migrate_symbols(struct list_head *src,
 	}
 }
 
-void xsplice_create_strings_elements(struct xsplice_elf *kelf)
+static void xsplice_create_strings_elements(struct xsplice_elf *kelf)
 {
 	struct section *sec;
 	struct symbol *sym;
@@ -1863,7 +1872,7 @@ void xsplice_create_strings_elements(struct xsplice_elf *kelf)
 	sym->name = ".xsplice.strings";
 }
 
-void xsplice_build_strings_section_data(struct xsplice_elf *kelf)
+static void xsplice_build_strings_section_data(struct xsplice_elf *kelf)
 {
 	struct string *string;
 	struct section *sec;
@@ -1893,8 +1902,8 @@ void xsplice_build_strings_section_data(struct xsplice_elf *kelf)
 	}
 }
 
-struct section *create_section_pair(struct xsplice_elf *kelf, char *name,
-                                    int entsize, int nr)
+static struct section *create_section_pair(struct xsplice_elf *kelf,
+					   char *name, int entsize, int nr)
 {
 	char *relaname;
 	struct section *sec, *relasec;
@@ -1949,8 +1958,9 @@ struct section *create_section_pair(struct xsplice_elf *kelf, char *name,
 	return sec;
 }
 
-void xsplice_create_patches_sections(struct xsplice_elf *kelf,
-                                    struct lookup_table *table, char *hint)
+static void xsplice_create_patches_sections(struct xsplice_elf *kelf,
+					    struct lookup_table *table,
+					    char *hint)
 {
 	int nr, index;
 	struct section *sec, *relasec;
@@ -2035,61 +2045,27 @@ void xsplice_create_patches_sections(struct xsplice_elf *kelf,
 
 }
 
-/* Resolve symbols using xen-syms */
-void xsplice_resolve_symbols(struct xsplice_elf *kelf,
-                            struct lookup_table *table, char *hint)
-{
-	struct symbol *sym;
-	struct lookup_result result;
-
-	list_for_each_entry(sym, &kelf->symbols, list) {
-		/* ignore NULL symbol */
-		if (!strlen(sym->name))
-			continue;
-		if (sym->sec)
-			continue;
-		if (sym->sym.st_shndx != SHN_UNDEF)
-			continue;
-
-		if (sym->bind == STB_LOCAL) {
-			if (lookup_local_symbol(table, sym->name,
-						hint, &result))
-				ERROR("lookup_local_symbol %s (%s)",
-				      sym->name, hint);
-		} else {
-			if (lookup_global_symbol(table, sym->name,
-						&result))
-				ERROR("lookup_global_symbol %s",
-				      sym->name);
-		}
-		log_debug("lookup for %s @ 0x%016lx len %lu\n",
-			  sym->name, result.value, result.size);
-		sym->sym.st_value += result.value;
-		sym->sym.st_shndx = SHN_ABS;
-	}
-}
-
-int is_null_sym(struct symbol *sym)
+static int is_null_sym(struct symbol *sym)
 {
 	return !strlen(sym->name);
 }
 
-int is_file_sym(struct symbol *sym)
+static int is_file_sym(struct symbol *sym)
 {
 	return sym->type == STT_FILE;
 }
 
-int is_local_func_sym(struct symbol *sym)
+static int is_local_func_sym(struct symbol *sym)
 {
 	return sym->bind == STB_LOCAL && sym->type == STT_FUNC;
 }
 
-int is_local_sym(struct symbol *sym)
+static int is_local_sym(struct symbol *sym)
 {
 	return sym->bind == STB_LOCAL;
 }
 
-void xsplice_reorder_symbols(struct xsplice_elf *kelf)
+static void xsplice_reorder_symbols(struct xsplice_elf *kelf)
 {
 	LIST_HEAD(symbols);
 
@@ -2107,7 +2083,7 @@ void xsplice_reorder_symbols(struct xsplice_elf *kelf)
 	list_replace(&symbols, &kelf->symbols);
 }
 
-void xsplice_reindex_elements(struct xsplice_elf *kelf)
+static void xsplice_reindex_elements(struct xsplice_elf *kelf)
 {
 	struct section *sec;
 	struct symbol *sym;
@@ -2127,7 +2103,7 @@ void xsplice_reindex_elements(struct xsplice_elf *kelf)
 	}
 }
 
-void xsplice_rebuild_rela_section_data(struct section *sec)
+static void xsplice_rebuild_rela_section_data(struct section *sec)
 {
 	struct rela *rela;
 	int nr = 0, index = 0, size;
@@ -2159,7 +2135,7 @@ void xsplice_rebuild_rela_section_data(struct section *sec)
 		ERROR("size mismatch in rebuilt rela section");
 }
 
-void print_strtab(char *buf, size_t size)
+static void print_strtab(char *buf, size_t size)
 {
 	int i;
 
@@ -2171,7 +2147,7 @@ void print_strtab(char *buf, size_t size)
 	}
 }
 
-void xsplice_create_shstrtab(struct xsplice_elf *kelf)
+static void xsplice_create_shstrtab(struct xsplice_elf *kelf)
 {
 	struct section *shstrtab, *sec;
 	size_t size, offset, len;
@@ -2218,7 +2194,7 @@ void xsplice_create_shstrtab(struct xsplice_elf *kelf)
 	}
 }
 
-void xsplice_create_strtab(struct xsplice_elf *kelf)
+static void xsplice_create_strtab(struct xsplice_elf *kelf)
 {
 	struct section *strtab;
 	struct symbol *sym;
@@ -2271,7 +2247,7 @@ void xsplice_create_strtab(struct xsplice_elf *kelf)
 	}
 }
 
-void xsplice_create_symtab(struct xsplice_elf *kelf)
+static void xsplice_create_symtab(struct xsplice_elf *kelf)
 {
 	struct section *symtab;
 	struct symbol *sym;
@@ -2311,7 +2287,8 @@ void xsplice_create_symtab(struct xsplice_elf *kelf)
 	symtab->sh.sh_info = nr_local;
 }
 
-void xsplice_write_output_elf(struct xsplice_elf *kelf, Elf *elf, char *outfile)
+static void xsplice_write_output_elf(struct xsplice_elf *kelf,
+				     Elf *elf, char *outfile)
 {
 	int fd;
 	struct section *sec;
@@ -2369,7 +2346,7 @@ void xsplice_write_output_elf(struct xsplice_elf *kelf, Elf *elf, char *outfile)
 		sh = sec->sh;
 
 		if (!gelf_update_shdr(scn, &sh))
-			ERROR("gelf_update_shdr");	
+			ERROR("gelf_update_shdr");
 	}
 
 	if (!gelf_update_ehdr(elfout, &ehout))
@@ -2544,8 +2521,6 @@ int main(int argc, char *argv[])
 	xsplice_create_strings_elements(kelf_out);
 	log_debug("Create patches sections\n");
 	xsplice_create_patches_sections(kelf_out, lookup, hint);
-	/* log_debug("Resolve symbols\n"); */
-	/* xsplice_resolve_symbols(kelf_out, lookup, hint); */
 	xsplice_build_strings_section_data(kelf_out);
 
 	/*
