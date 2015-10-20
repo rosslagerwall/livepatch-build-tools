@@ -152,6 +152,8 @@ struct xsplice_elf {
 	int fd;
 };
 
+#define PATCH_INSN_SIZE 5
+
 struct xsplice_patch_func {
 	unsigned long new_addr;
 	unsigned long new_size;
@@ -1989,6 +1991,9 @@ void xsplice_create_patches_sections(struct xsplice_elf *kelf,
 			}
 			log_debug("lookup for %s @ 0x%016lx len %lu\n",
 			          sym->name, result.value, result.size);
+
+			if (result.size < PATCH_INSN_SIZE)
+				ERROR("%s too small to patch", sym->name);
 
 			/* add entry in text section */
 			funcs[index].old_addr = result.value;
