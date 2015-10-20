@@ -1,3 +1,4 @@
 create-diff-object
+prelink
 *.o
 *.d

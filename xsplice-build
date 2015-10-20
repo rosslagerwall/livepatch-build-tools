@@ -136,7 +136,8 @@ function create_patch()
     fi
 
     echo "Creating patch module..."
-    ld -r -o "${PATCHNAME}.xsplice" $(find output -type f -name "*.o") || die
+    ld -r -o output.o $(find output -type f -name "*.o") || die
+    "${SCRIPTDIR}"/prelink $debugopt output.o "${PATCHNAME}.xsplice" "$XENSYMS" &>> "${OUTPUT}/prelink.log" || die
 }
 
 usage() {
