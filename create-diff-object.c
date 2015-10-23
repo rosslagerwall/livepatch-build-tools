@@ -52,6 +52,9 @@
 #include "asm/insn.h"
 #include "common.h"
 
+char *childobj;
+enum loglevel loglevel = NORMAL;
+
 static void xsplice_compare_elf_headers(Elf *elf1, Elf *elf2)
 {
 	GElf_Ehdr eh1, eh2;

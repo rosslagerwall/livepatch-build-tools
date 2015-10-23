@@ -3,7 +3,7 @@
 
 #include <error.h>
 
-static char *childobj;
+extern char *childobj;
 
 #define ERROR(format, ...) \
 	error(1, 0, "ERROR: %s: %s: %d: " format, childobj, __FUNCTION__, __LINE__, ##__VA_ARGS__)
@@ -38,7 +38,7 @@ enum loglevel {
 	NORMAL
 };
 
-static enum loglevel loglevel = NORMAL;
+extern enum loglevel loglevel;
 
 /*******************
  * Data structures

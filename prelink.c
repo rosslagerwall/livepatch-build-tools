@@ -36,6 +36,9 @@
 #include "asm/insn.h"
 #include "common.h"
 
+char *childobj;
+enum loglevel loglevel = NORMAL;
+
 /* Resolve symbols using xen-syms */
 void xsplice_resolve_symbols(struct xsplice_elf *kelf,
                             struct lookup_table *table)
