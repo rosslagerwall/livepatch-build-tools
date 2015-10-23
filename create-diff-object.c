@@ -731,6 +731,70 @@ static void xsplice_compare_correlated_elements(struct xsplice_elf *kelf)
 	xsplice_compare_symbols(&kelf->symbols);
 }
 
+static void xsplice_mark_ignored_functions_same(struct xsplice_elf *kelf)
+{
+	struct section *sec;
+	struct rela *rela;
+
+	sec = find_section_by_name(&kelf->sections, ".xsplice.ignore.functions");
+	if (!sec)
+		return;
+
+	list_for_each_entry(rela, &sec->rela->relas, list) {
+		if (!rela->sym->sec)
+			ERROR("expected bundled symbol");
+		if (rela->sym->type != STT_FUNC)
+			ERROR("expected function symbol");
+		log_normal("ignoring function: %s\n", rela->sym->name);
+		if (rela->sym->status != CHANGED)
+			log_normal("NOTICE: no change detected in function %s, unnecessary XSPLICE_IGNORE_FUNCTION()?\n", rela->sym->name);
+		rela->sym->status = SAME;
+		rela->sym->sec->status = SAME;
+		if (rela->sym->sec->secsym)
+			rela->sym->sec->secsym->status = SAME;
+		if (rela->sym->sec->rela)
+			rela->sym->sec->rela->status = SAME;
+	}
+}
+
+static void xsplice_mark_ignored_sections(struct xsplice_elf *kelf)
+{
+	struct section *sec, *strsec, *ignoresec;
+	struct rela *rela;
+	char *name;
+
+	sec = find_section_by_name(&kelf->sections, ".xsplice.ignore.sections");
+	if (!sec)
+		return;
+
+	list_for_each_entry(rela, &sec->rela->relas, list) {
+		strsec = rela->sym->sec;
+		strsec->status = CHANGED;
+		/*
+		 * Include the string section here.  This is because the
+		 * XSPLICE_IGNORE_SECTION() macro is passed a literal string
+		 * by the patch author, resulting in a change to the string
+		 * section.  If we don't include it, then we will potentially
+		 * get a "changed section not included" error in
+		 * xsplice_verify_patchability() if no other function based change
+		 * also changes the string section.  We could try to exclude each
+		 * literal string added to the section by XSPLICE_IGNORE_SECTION()
+		 * from the section data comparison, but this is a simpler way.
+		 */
+		strsec->include = 1;
+		name = strsec->data->d_buf + rela->addend;
+		ignoresec = find_section_by_name(&kelf->sections, name);
+		if (!ignoresec)
+			ERROR("XSPLICE_IGNORE_SECTION: can't find %s", name);
+		log_normal("ignoring section: %s\n", name);
+		if (is_rela_section(ignoresec))
+			ignoresec = ignoresec->base;
+		ignoresec->ignore = 1;
+		if (ignoresec->twin)
+			ignoresec->twin->ignore = 1;
+	}
+}
+
 static void xsplice_mark_ignored_sections_same(struct xsplice_elf *kelf)
 {
 	struct section *sec;
@@ -1099,6 +1163,47 @@ static void xsplice_include_debug_sections(struct xsplice_elf *kelf)
 			if (!rela->sym->sec->include)
 				list_del(&rela->list);
 	}
+}
+
+static void xsplice_include_hook_elements(struct xsplice_elf *kelf)
+{
+	struct section *sec;
+	struct symbol *sym;
+	struct rela *rela;
+
+	/* include load/unload sections */
+	list_for_each_entry(sec, &kelf->sections, list) {
+		if (!strcmp(sec->name, ".xsplice.hooks.load") ||
+		    !strcmp(sec->name, ".xsplice.hooks.unload") ||
+		    !strcmp(sec->name, ".rela.xsplice.hooks.load") ||
+		    !strcmp(sec->name, ".rela.xsplice.hooks.unload")) {
+			sec->include = 1;
+			if (is_rela_section(sec)) {
+				/* include hook dependencies */
+				rela = list_entry(sec->relas.next,
+			                         struct rela, list);
+				sym = rela->sym;
+				log_normal("found hook: %s\n",sym->name);
+				xsplice_include_symbol(sym, 0);
+				/* strip the hook symbol */
+				sym->include = 0;
+				sym->sec->sym = NULL;
+				/* use section symbol instead */
+				rela->sym = sym->sec->secsym;
+			} else {
+				sec->secsym->include = 1;
+			}
+		}
+	}
+
+	/*
+	 * Strip temporary global load/unload function pointer objects
+	 * used by the xsplice_[load|unload]() macros.
+	 */
+	list_for_each_entry(sym, &kelf->symbols, list)
+		if (!strcmp(sym->name, "xsplice_load_data") ||
+		    !strcmp(sym->name, "xsplice_unload_data"))
+			sym->include = 0;
 }
 
 static int xsplice_include_new_globals(struct xsplice_elf *kelf)
@@ -1582,6 +1687,8 @@ int main(int argc, char *argv[])
 	 * We access its sections via the twin pointers in the
 	 * section, symbol, and rela lists of kelf_patched.
 	 */
+	log_debug("Mark ignored sections\n");
+	xsplice_mark_ignored_sections(kelf_patched);
 	log_debug("Compare correlated elements\n");
 	xsplice_compare_correlated_elements(kelf_patched);
 	log_debug("Elf teardown base\n");
@@ -1589,6 +1696,8 @@ int main(int argc, char *argv[])
 	log_debug("Elf free base\n");
 	xsplice_elf_free(kelf_base);
 
+	log_debug("Mark ignored functions same\n");
+	xsplice_mark_ignored_functions_same(kelf_patched);
 	log_debug("Mark ignored sections same\n");
 	xsplice_mark_ignored_sections_same(kelf_patched);
 	log_debug("Mark constant labels same\n");
@@ -1601,6 +1710,8 @@ int main(int argc, char *argv[])
 	log_debug("num_changed = %d\n", num_changed);
 	log_debug("Include debug sections\n");
 	xsplice_include_debug_sections(kelf_patched);
+	log_debug("Include hook elements\n");
+	xsplice_include_hook_elements(kelf_patched);
 	log_debug("Include new globals\n");
 	new_globals_exist = xsplice_include_new_globals(kelf_patched);
 	log_debug("new_globals_exist = %d\n", new_globals_exist);
