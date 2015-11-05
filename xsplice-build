@@ -29,6 +29,7 @@ CPUS="$(getconf _NPROCESSORS_ONLN)"
 DEBUG=n
 XEN_DEBUG=n
 SKIP=
+DEPENDS=
 XENSYMS=xen-syms
 
 warn() {
@@ -135,25 +136,35 @@ function create_patch()
         die "no functional changes found"
     fi
 
+    # Create a dependency section
+    > depends.bin
+    if [ -n "$DEPENDS" ]; then
+        perl -e "print pack 'H*', '${DEPENDS}'" >> depends.bin
+    fi
+
     echo "Creating patch module..."
     ld -r -o output.o --build-id=sha1 $(find output -type f -name "*.o") || die
     "${SCRIPTDIR}"/prelink $debugopt output.o "${PATCHNAME}.xsplice" "$XENSYMS" &>> "${OUTPUT}/prelink.log" || die
+
+    objcopy --add-section .xsplice.depends=depends.bin "${PATCHNAME}.xsplice"
+    objcopy --set-section-flags .xsplice.depends=alloc,readonly "${PATCHNAME}.xsplice"
 }
 
 usage() {
-	echo "usage: $(basename $0) [options]" >&2
-	echo "		-h, --help	   Show this help message" >&2
-	echo "		-s, --srcdir	   Xen source directory" >&2
-	echo "		-p, --patch	   Patch file" >&2
-	echo "		-o, --output	   Output directory" >&2
-	echo "		-j, --cpus	   Number of CPUs to use" >&2
-	echo "		-k, --skip	   Skip build or diff phase" >&2
-	echo "		-d, --debug	   Enable debug logging" >&2
-	echo "		--xen-debug	   Build debug Xen" >&2
-	echo "		--xen-syms	   Build against a xen-syms" >&2
+    echo "usage: $(basename $0) [options]" >&2
+    echo "        -h, --help         Show this help message" >&2
+    echo "        -s, --srcdir       Xen source directory" >&2
+    echo "        -p, --patch        Patch file" >&2
+    echo "        -o, --output       Output directory" >&2
+    echo "        -j, --cpus         Number of CPUs to use" >&2
+    echo "        -k, --skip         Skip build or diff phase" >&2
+    echo "        -d, --debug        Enable debug logging" >&2
+    echo "        --xen-debug        Build debug Xen" >&2
+    echo "        --xen-syms         Build against a xen-syms" >&2
+    echo "        --depends          Required build-id" >&2
 }
 
-options=$(getopt -o hs:p:o:j:k:d -l "help,srcdir:patch:output:cpus:,skip:,debug,xen-debug,xen-syms:" -- "$@") || die "getopt failed"
+options=$(getopt -o hs:p:o:j:k:d -l "help,srcdir:patch:output:cpus:,skip:,debug,xen-debug,xen-syms:,depends:" -- "$@") || die "getopt failed"
 
 eval set -- "$options"
 
@@ -200,6 +211,11 @@ while [[ $# -gt 0 ]]; do
             shift
             XENSYMS="$(realpath -m -- "$1")"
             [ -f "$XENSYMS" ] || die "xen-syms file does not exist"
+            shift
+            ;;
+        --depends)
+            shift
+            DEPENDS="$1"
             shift
             ;;
         --)
