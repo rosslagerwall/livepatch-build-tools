@@ -1457,7 +1457,7 @@ static struct section *create_section_pair(struct xsplice_elf *kelf,
 
 static void xsplice_create_patches_sections(struct xsplice_elf *kelf,
 					    struct lookup_table *table,
-					    char *hint)
+					    char *hint, int resolve)
 {
 	int nr, index;
 	struct section *sec, *relasec;
@@ -1504,7 +1504,11 @@ static void xsplice_create_patches_sections(struct xsplice_elf *kelf,
 				ERROR("%s too small to patch", sym->name);
 
 			/* add entry in text section */
-			funcs[index].old_addr = result.value;
+			if (resolve)
+				funcs[index].old_addr = result.value;
+			else
+				/* This will be filled in at module load time */
+				funcs[index].old_addr = 0;
 			funcs[index].old_size = result.size;
 			funcs[index].new_addr = 0;
 			funcs[index].new_size = sym->sym.st_size;
@@ -1598,12 +1602,14 @@ static void xsplice_reindex_elements(struct xsplice_elf *kelf)
 struct arguments {
 	char *args[4];
 	int debug;
+	int resolve;
 };
 
 static char args_doc[] = "original.o patched.o kernel-object output.o";
 
 static struct argp_option options[] = {
 	{"debug", 'd', 0, 0, "Show debug output" },
+	{"resolve", 'r', 0, 0, "Resolve to-be-patched function addresses" },
 	{ 0 }
 };
 
@@ -1617,6 +1623,9 @@ static error_t parse_opt (int key, char *arg, struct argp_state *state)
 	{
 		case 'd':
 			arguments->debug = 1;
+			break;
+		case 'r':
+			arguments->resolve = 1;
 			break;
 		case ARGP_KEY_ARG:
 			if (state->arg_num >= 4)
@@ -1648,6 +1657,7 @@ int main(int argc, char *argv[])
 	char *hint = NULL;
 
 	arguments.debug = 0;
+	arguments.resolve = 0;
 	argp_parse (&argp, argc, argv, 0, 0, &arguments);
 	if (arguments.debug)
 		loglevel = DEBUG;
@@ -1763,7 +1773,8 @@ int main(int argc, char *argv[])
 	log_debug("Create strings elements\n");
 	xsplice_create_strings_elements(kelf_out);
 	log_debug("Create patches sections\n");
-	xsplice_create_patches_sections(kelf_out, lookup, hint);
+	xsplice_create_patches_sections(kelf_out, lookup, hint,
+			                arguments.resolve);
 	xsplice_build_strings_section_data(kelf_out);
 
 	/*
