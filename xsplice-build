@@ -30,6 +30,7 @@ DEBUG=n
 XEN_DEBUG=n
 SKIP=
 DEPENDS=
+PRELINK=
 XENSYMS=xen-syms
 
 warn() {
@@ -111,7 +112,7 @@ function create_patch()
         mkdir -p "output/$(dirname $i)" || die
         echo "Processing ${i}"
         echo "Run create-diff-object on $i" >> "${OUTPUT}/create-diff-object.log"
-        "${SCRIPTDIR}"/create-diff-object $debugopt "original/$i" "patched/$i" "$XENSYMS" "output/$i" &>> "${OUTPUT}/create-diff-object.log"
+        "${SCRIPTDIR}"/create-diff-object $debugopt $PRELINK "original/$i" "patched/$i" "$XENSYMS" "output/$i" &>> "${OUTPUT}/create-diff-object.log"
         rc="${PIPESTATUS[0]}"
         if [[ $rc = 139 ]]; then
             warn "create-diff-object SIGSEGV"
@@ -143,8 +144,13 @@ function create_patch()
     fi
 
     echo "Creating patch module..."
-    ld -r -o output.o --build-id=sha1 $(find output -type f -name "*.o") || die
-    "${SCRIPTDIR}"/prelink $debugopt output.o "${PATCHNAME}.xsplice" "$XENSYMS" &>> "${OUTPUT}/prelink.log" || die
+    if [ -z "$PRELINK" ]; then
+        ld -r -o "${PATCHNAME}.xsplice" --build-id=sha1 $(find output -type f -name "*.o") || die
+        chmod +x "${PATCHNAME}.xsplice"
+    else
+        ld -r -o output.o --build-id=sha1 $(find output -type f -name "*.o") || die
+        "${SCRIPTDIR}"/prelink $debugopt output.o "${PATCHNAME}.xsplice" "$XENSYMS" &>> "${OUTPUT}/prelink.log" || die
+    fi
 
     objcopy --add-section .xsplice.depends=depends.bin "${PATCHNAME}.xsplice"
     objcopy --set-section-flags .xsplice.depends=alloc,readonly "${PATCHNAME}.xsplice"
@@ -162,9 +168,10 @@ usage() {
     echo "        --xen-debug        Build debug Xen" >&2
     echo "        --xen-syms         Build against a xen-syms" >&2
     echo "        --depends          Required build-id" >&2
+    echo "        --prelink          Prelink" >&2
 }
 
-options=$(getopt -o hs:p:o:j:k:d -l "help,srcdir:patch:output:cpus:,skip:,debug,xen-debug,xen-syms:,depends:" -- "$@") || die "getopt failed"
+options=$(getopt -o hs:p:o:j:k:d -l "help,srcdir:patch:output:cpus:,skip:,debug,xen-debug,xen-syms:,depends:,prelink" -- "$@") || die "getopt failed"
 
 eval set -- "$options"
 
@@ -216,6 +223,10 @@ while [[ $# -gt 0 ]]; do
         --depends)
             shift
             DEPENDS="$1"
+            shift
+            ;;
+        --prelink)
+            PRELINK=--resolve
             shift
             ;;
         --)
