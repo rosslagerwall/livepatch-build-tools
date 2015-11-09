@@ -1399,6 +1399,46 @@ static void xsplice_build_strings_section_data(struct xsplice_elf *kelf)
 	}
 }
 
+static char *mangle_local_symbol(char *filename, char *symname)
+{
+	char *s, *ptr;
+
+	/* filename + # + symbolname */
+	ptr = s = malloc(strlen(filename) + 1 + strlen(symname) + 1);
+	if (!s)
+		ERROR("malloc");
+
+	ptr = stpcpy(ptr, filename);
+	*ptr++ = '#';
+	strcpy(ptr, symname);
+
+	return s;
+}
+
+/*
+ * Rename local symbols to the filename#symbol format used by Xen's "special"
+ * symbol table.
+ */
+static void xsplice_rename_local_symbols(struct xsplice_elf *kelf, char *hint)
+{
+	struct symbol *sym;
+
+	list_for_each_entry(sym, &kelf->symbols, list) {
+		/* ignore NULL symbol */
+		if (!strlen(sym->name))
+			continue;
+
+		if (sym->type != STT_FUNC && sym->type != STT_OBJECT)
+			continue;
+
+		if (sym->bind != STB_LOCAL)
+			continue;
+
+		sym->name = mangle_local_symbol(hint, sym->name);
+		log_debug("Local symbol mangled to: %s\n", sym->name);
+	}
+}
+
 static struct section *create_section_pair(struct xsplice_elf *kelf,
 					   char *name, int entsize, int nr)
 {
@@ -1465,6 +1505,7 @@ static void xsplice_create_patches_sections(struct xsplice_elf *kelf,
 	struct rela *rela;
 	struct lookup_result result;
 	struct xsplice_patch_func *funcs;
+	char *funcname;
 
 	/* count patched functions */
 	nr = 0;
@@ -1487,11 +1528,13 @@ static void xsplice_create_patches_sections(struct xsplice_elf *kelf,
 	list_for_each_entry(sym, &kelf->symbols, list) {
 		if (sym->type == STT_FUNC && sym->status == CHANGED) {
 			if (sym->bind == STB_LOCAL) {
+				funcname = mangle_local_symbol(hint, sym->name);
 				if (lookup_local_symbol(table, sym->name,
 				                        hint, &result))
 					ERROR("lookup_local_symbol %s (%s)",
 					      sym->name, hint);
 			} else {
+				funcname = sym->name;
 				if (lookup_global_symbol(table, sym->name,
 				                        &result))
 					ERROR("lookup_global_symbol %s",
@@ -1532,7 +1575,7 @@ static void xsplice_create_patches_sections(struct xsplice_elf *kelf,
 			ALLOC_LINK(rela, &relasec->relas);
 			rela->sym = strsym;
 			rela->type = R_X86_64_64;
-			rela->addend = offset_of_string(&kelf->strings, sym->name);
+			rela->addend = offset_of_string(&kelf->strings, funcname);
 			rela->offset = index * sizeof(*funcs) +
 			               offsetof(struct xsplice_patch_func, name);
 
@@ -1776,6 +1819,9 @@ int main(int argc, char *argv[])
 	xsplice_create_patches_sections(kelf_out, lookup, hint,
 			                arguments.resolve);
 	xsplice_build_strings_section_data(kelf_out);
+
+	log_debug("Rename local symbols\n");
+	xsplice_rename_local_symbols(kelf_out, hint);
 
 	/*
 	 *  At this point, the set of output sections and symbols is

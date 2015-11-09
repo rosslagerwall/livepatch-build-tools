@@ -63,10 +63,21 @@ void xsplice_resolve_symbols(struct xsplice_elf *kelf,
 			continue;
 
 		if (sym->bind == STB_LOCAL) {
-			if (lookup_local_symbol(table, sym->name,
-						curfile, &result))
+			/*
+			 * Symbols are mangled to match Xen's runtime symbol
+			 * mangling. However, the ELF symbol table in xen-syms
+			 * is normal, so we need to unmangle the local symbols.
+			 */
+
+			char *s = strchr(sym->name, '#');
+			if (s)
+				s++;
+			else
+				s = sym->name;
+
+			if (lookup_local_symbol(table, s, curfile, &result))
 				ERROR("lookup_local_symbol %s (%s)",
-				      sym->name, curfile);
+				      s, curfile);
 		} else {
 			if (lookup_global_symbol(table, sym->name,
 						&result))
