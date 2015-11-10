@@ -1,0 +1,6 @@
+#!/bin/bash
+
+set -e
+
+./sign-file sha256 signing_key.pem signing_key.x509 "$@"
+chmod +x "$@"
