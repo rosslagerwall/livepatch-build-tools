@@ -2,3 +2,7 @@ create-diff-object
 prelink
 *.o
 *.d
+sign/extract-cert
+sign/sign-file
+sign/signing_key.pem
+sign/signing_key.x509
