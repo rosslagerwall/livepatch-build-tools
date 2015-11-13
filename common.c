@@ -344,7 +344,8 @@ static void xsplice_create_rela_list(struct xsplice_elf *kelf,
 			 * If the relocation is to a debug frame, ignore the
 			 * since it encodes the line number.
 			 */
-			if (rela->type == R_X86_64_PC32) {
+			if (rela->type == R_X86_64_PC32 ||
+			    rela->type == R_X86_64_PLT32) {
 				if (!strncmp(sec->base->name, ".text", 5)) {
 					struct insn insn;
 					rela_insn(sec, rela, &insn);

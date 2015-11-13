@@ -147,7 +147,8 @@ static void xsplice_replace_sections_syms(struct xsplice_elf *kelf)
 				continue;
 			}
 
-			if (rela->type == R_X86_64_PC32) {
+			if (rela->type == R_X86_64_PC32 ||
+			    rela->type == R_X86_64_PLT32) {
 				struct insn insn;
 				rela_insn(sec, rela, &insn);
 				add_off = (long)insn.next_byte -
