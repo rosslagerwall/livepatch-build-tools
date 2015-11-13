@@ -66,7 +66,7 @@ struct symbol *find_symbol_by_name(struct list_head *list, const char *name)
 	return NULL;
 }
 
-static void xsplice_create_section_list(struct xsplice_elf *kelf)
+static void kpatch_create_section_list(struct kpatch_elf *kelf)
 {
 	Elf_Scn *scn = NULL;
 	struct section *sec;
@@ -156,7 +156,7 @@ static int is_bundleable(struct symbol *sym)
 	return 0;
 }
 
-static void xsplice_create_symbol_list(struct xsplice_elf *kelf)
+static void kpatch_create_symbol_list(struct kpatch_elf *kelf)
 {
 	struct section *symtab;
 	struct symbol *sym;
@@ -286,7 +286,7 @@ void rela_insn(struct section *sec, struct rela *rela, struct insn *insn)
 	}
 }
 
-static void xsplice_create_rela_list(struct xsplice_elf *kelf,
+static void kpatch_create_rela_list(struct kpatch_elf *kelf,
 				     struct section *sec)
 {
 	int rela_nr, index = 0, skip = 0;
@@ -372,11 +372,11 @@ static void xsplice_create_rela_list(struct xsplice_elf *kelf,
 	}
 }
 
-struct xsplice_elf *xsplice_elf_open(const char *name)
+struct kpatch_elf *kpatch_elf_open(const char *name)
 {
 	Elf *elf;
 	int fd;
-	struct xsplice_elf *kelf;
+	struct kpatch_elf *kelf;
 	struct section *sec;
 
 	fd = open(name, O_RDONLY);
@@ -398,15 +398,15 @@ struct xsplice_elf *xsplice_elf_open(const char *name)
 	/* read and store section, symbol entries from file */
 	kelf->elf = elf;
 	kelf->fd = fd;
-	xsplice_create_section_list(kelf);
-	xsplice_create_symbol_list(kelf);
+	kpatch_create_section_list(kelf);
+	kpatch_create_symbol_list(kelf);
 
 	/* for each rela section, read and store the rela entries */
 	list_for_each_entry(sec, &kelf->sections, list) {
 		if (!is_rela_section(sec))
 			continue;
 		INIT_LIST_HEAD(&sec->relas);
-		xsplice_create_rela_list(kelf, sec);
+		kpatch_create_rela_list(kelf, sec);
 	}
 
 	return kelf;
@@ -419,7 +419,7 @@ struct xsplice_elf *xsplice_elf_open(const char *name)
  * help cause an immediate and obvious issue when a logic error leads to
  * accessing data that is not intended to be accessed past a particular point.
  */
-void xsplice_elf_teardown(struct xsplice_elf *kelf)
+void kpatch_elf_teardown(struct kpatch_elf *kelf)
 {
 	struct section *sec, *safesec;
 	struct symbol *sym, *safesym;
@@ -445,7 +445,7 @@ void xsplice_elf_teardown(struct xsplice_elf *kelf)
 	INIT_LIST_HEAD(&kelf->symbols);
 }
 
-void xsplice_elf_free(struct xsplice_elf *kelf)
+void kpatch_elf_free(struct kpatch_elf *kelf)
 {
 	elf_end(kelf->elf);
 	close(kelf->fd);
@@ -453,7 +453,7 @@ void xsplice_elf_free(struct xsplice_elf *kelf)
 	free(kelf);
 }
 
-void xsplice_write_output_elf(struct xsplice_elf *kelf,
+void kpatch_write_output_elf(struct kpatch_elf *kelf,
 			      Elf *elf, char *outfile)
 {
 	int fd;
@@ -524,7 +524,7 @@ void xsplice_write_output_elf(struct xsplice_elf *kelf,
 	}
 }
 
-void xsplice_dump_kelf(struct xsplice_elf *kelf)
+void kpatch_dump_kelf(struct kpatch_elf *kelf)
 {
 	struct section *sec;
 	struct symbol *sym;
@@ -584,7 +584,7 @@ static void print_strtab(char *buf, size_t size)
 	}
 }
 
-void xsplice_create_shstrtab(struct xsplice_elf *kelf)
+void kpatch_create_shstrtab(struct kpatch_elf *kelf)
 {
 	struct section *shstrtab, *sec;
 	size_t size, offset, len;
@@ -631,7 +631,7 @@ void xsplice_create_shstrtab(struct xsplice_elf *kelf)
 	}
 }
 
-void xsplice_create_strtab(struct xsplice_elf *kelf)
+void kpatch_create_strtab(struct kpatch_elf *kelf)
 {
 	struct section *strtab;
 	struct symbol *sym;
@@ -684,7 +684,7 @@ void xsplice_create_strtab(struct xsplice_elf *kelf)
 	}
 }
 
-void xsplice_create_symtab(struct xsplice_elf *kelf)
+void kpatch_create_symtab(struct kpatch_elf *kelf)
 {
 	struct section *symtab;
 	struct symbol *sym;
@@ -724,7 +724,7 @@ void xsplice_create_symtab(struct xsplice_elf *kelf)
 	symtab->sh.sh_info = nr_local;
 }
 
-void xsplice_rebuild_rela_section_data(struct section *sec)
+void kpatch_rebuild_rela_section_data(struct section *sec)
 {
 	struct rela *rela;
 	int nr = 0, index = 0, size;

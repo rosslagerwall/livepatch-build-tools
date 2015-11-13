@@ -55,7 +55,7 @@
 char *childobj;
 enum loglevel loglevel = NORMAL;
 
-static void xsplice_compare_elf_headers(Elf *elf1, Elf *elf2)
+static void kpatch_compare_elf_headers(Elf *elf1, Elf *elf2)
 {
 	GElf_Ehdr eh1, eh2;
 
@@ -78,7 +78,7 @@ static void xsplice_compare_elf_headers(Elf *elf1, Elf *elf2)
 		DIFF_FATAL("ELF headers differ");
 }
 
-static void xsplice_check_program_headers(Elf *elf)
+static void kpatch_check_program_headers(Elf *elf)
 {
 	size_t ph_nr;
 
@@ -89,7 +89,7 @@ static void xsplice_check_program_headers(Elf *elf)
 		DIFF_FATAL("ELF contains program header");
 }
 
-static void xsplice_mark_grouped_sections(struct xsplice_elf *kelf)
+static void kpatch_mark_grouped_sections(struct kpatch_elf *kelf)
 {
 	struct section *groupsec, *sec;
 	unsigned int *data, *end;
@@ -119,7 +119,7 @@ static void xsplice_mark_grouped_sections(struct xsplice_elf *kelf)
  * section symbol in this case so that the relas can be properly correlated and
  * so that the existing object/function in vmlinux can be linked to.
  */
-static void xsplice_replace_sections_syms(struct xsplice_elf *kelf)
+static void kpatch_replace_sections_syms(struct kpatch_elf *kelf)
 {
 	struct section *sec;
 	struct rela *rela;
@@ -196,7 +196,7 @@ static void xsplice_replace_sections_syms(struct xsplice_elf *kelf)
  * This is like strcmp, but for gcc-mangled symbols.  It skips the comparison
  * of any substring which consists of '.' followed by any number of digits.
  */
-static int xsplice_mangled_strcmp(char *s1, char *s2)
+static int kpatch_mangled_strcmp(char *s1, char *s2)
 {
 	while (*s1 == *s2) {
 		if (!*s1)
@@ -224,8 +224,8 @@ static int xsplice_mangled_strcmp(char *s1, char *s2)
  * with a different trailing number.  Rename any mangled patched functions to
  * match their base counterparts.
  */
-static void xsplice_rename_mangled_functions(struct xsplice_elf *base,
-				             struct xsplice_elf *patched)
+static void kpatch_rename_mangled_functions(struct kpatch_elf *base,
+				            struct kpatch_elf *patched)
 {
 	struct symbol *sym, *basesym;
 	char name[256], *origname;
@@ -243,7 +243,7 @@ static void xsplice_rename_mangled_functions(struct xsplice_elf *base,
 
 		found = 0;
 		list_for_each_entry(basesym, &base->symbols, list) {
-			if (!xsplice_mangled_strcmp(basesym->name, sym->name)) {
+			if (!kpatch_mangled_strcmp(basesym->name, sym->name)) {
 				found = 1;
 				break;
 			}
@@ -350,8 +350,8 @@ static int is_constant_label(struct symbol *sym)
 	return 1;
 }
 
-static void xsplice_correlate_sections(struct list_head *seclist1,
-				       struct list_head *seclist2)
+static void kpatch_correlate_sections(struct list_head *seclist1,
+				      struct list_head *seclist2)
 {
 	struct section *sec1, *sec2;
 
@@ -386,8 +386,8 @@ static void xsplice_correlate_sections(struct list_head *seclist1,
 	}
 }
 
-static void xsplice_correlate_symbols(struct list_head *symlist1,
-				      struct list_head *symlist2)
+static void kpatch_correlate_symbols(struct list_head *symlist1,
+				     struct list_head *symlist2)
 {
 	struct symbol *sym1, *sym2;
 
@@ -419,14 +419,14 @@ static void xsplice_correlate_symbols(struct list_head *symlist1,
 	}
 }
 
-static void xsplice_correlate_elfs(struct xsplice_elf *kelf1,
-				   struct xsplice_elf *kelf2)
+static void kpatch_correlate_elfs(struct kpatch_elf *kelf1,
+				  struct kpatch_elf *kelf2)
 {
-	xsplice_correlate_sections(&kelf1->sections, &kelf2->sections);
-	xsplice_correlate_symbols(&kelf1->symbols, &kelf2->symbols);
+	kpatch_correlate_sections(&kelf1->sections, &kelf2->sections);
+	kpatch_correlate_symbols(&kelf1->symbols, &kelf2->symbols);
 }
 
-static char *xsplice_section_function_name(struct section *sec)
+static char *kpatch_section_function_name(struct section *sec)
 {
 	if (is_rela_section(sec))
 		sec = sec->base;
@@ -438,8 +438,8 @@ static char *xsplice_section_function_name(struct section *sec)
  * the patched object, find a corresponding usage of a similarly named symbol
  * in the base object.
  */
-static struct symbol *xsplice_find_static_twin(struct section *sec,
-					       struct symbol *sym)
+static struct symbol *kpatch_find_static_twin(struct section *sec,
+					      struct symbol *sym)
 {
 	struct rela *rela;
 	struct symbol *basesym;
@@ -456,9 +456,9 @@ static struct symbol *xsplice_find_static_twin(struct section *sec,
 	list_for_each_entry(rela, &sec->relas, list) {
 		if (rela->sym == sym || rela->sym->twin)
 			continue;
-		if (!xsplice_mangled_strcmp(rela->sym->name, sym->name))
+		if (!kpatch_mangled_strcmp(rela->sym->name, sym->name))
 			ERROR("found another static local variable matching %s in patched %s",
-			      sym->name, xsplice_section_function_name(sec));
+			      sym->name, kpatch_section_function_name(sec));
 	}
 
 	/* find the base object's corresponding variable */
@@ -466,11 +466,11 @@ static struct symbol *xsplice_find_static_twin(struct section *sec,
 	list_for_each_entry(rela, &sec->twin->relas, list) {
 		if (rela->sym->twin)
 			continue;
-		if (xsplice_mangled_strcmp(rela->sym->name, sym->name))
+		if (kpatch_mangled_strcmp(rela->sym->name, sym->name))
 			continue;
 		if (basesym && basesym != rela->sym)
 			ERROR("found two static local variables matching %s in orig %s",
-			      sym->name, xsplice_section_function_name(sec));
+			      sym->name, kpatch_section_function_name(sec));
 
 		basesym = rela->sym;
 	}
@@ -484,8 +484,8 @@ static struct symbol *xsplice_find_static_twin(struct section *sec,
  * can arbitrarily change.  Try to rename the patched version of the symbol to
  * match the base version and then correlate them.
  */
-static void xsplice_correlate_static_local_variables(struct xsplice_elf *base,
-					             struct xsplice_elf *patched)
+static void kpatch_correlate_static_local_variables(struct kpatch_elf *base,
+					            struct kpatch_elf *patched)
 {
 	struct symbol *sym, *basesym, *tmpsym;
 	struct section *tmpsec, *sec;
@@ -523,7 +523,7 @@ static void xsplice_correlate_static_local_variables(struct xsplice_elf *base,
 				if (rela->sym != sym)
 					continue;
 
-				tmpsym = xsplice_find_static_twin(tmpsec, sym);
+				tmpsym = kpatch_find_static_twin(tmpsec, sym);
 				if (basesym && tmpsym && basesym != tmpsym)
 					ERROR("found two twins for static local variable %s: %s and %s",
 					      sym->name, basesym->name,
@@ -542,7 +542,7 @@ static void xsplice_correlate_static_local_variables(struct xsplice_elf *base,
 		if (!basesym) {
 			log_normal("WARNING: unable to correlate static local variable %s used by %s, assuming variable is new\n",
 				   sym->name,
-				   xsplice_section_function_name(sec));
+				   kpatch_section_function_name(sec));
 			continue;
 		}
 
@@ -586,13 +586,13 @@ static int rela_equal(struct rela *rela1, struct rela *rela2)
 		return 1;
 
 	if (is_special_static(rela1->sym))
-		return !xsplice_mangled_strcmp(rela1->sym->name,
+		return !kpatch_mangled_strcmp(rela1->sym->name,
 					      rela2->sym->name);
 
 	return !strcmp(rela1->sym->name, rela2->sym->name);
 }
 
-static void xsplice_compare_correlated_rela_section(struct section *sec)
+static void kpatch_compare_correlated_rela_section(struct section *sec)
 {
 	struct rela *rela1, *rela2 = NULL;
 
@@ -609,7 +609,7 @@ static void xsplice_compare_correlated_rela_section(struct section *sec)
 	sec->status = SAME;
 }
 
-static void xsplice_compare_correlated_nonrela_section(struct section *sec)
+static void kpatch_compare_correlated_nonrela_section(struct section *sec)
 {
 	struct section *sec1 = sec, *sec2 = sec->twin;
 
@@ -620,7 +620,7 @@ static void xsplice_compare_correlated_nonrela_section(struct section *sec)
 		sec->status = SAME;
 }
 
-static void xsplice_compare_correlated_section(struct section *sec)
+static void kpatch_compare_correlated_section(struct section *sec)
 {
 	struct section *sec1 = sec, *sec2 = sec->twin;
 
@@ -641,22 +641,22 @@ static void xsplice_compare_correlated_section(struct section *sec)
 	}
 
 	if (is_rela_section(sec))
-		xsplice_compare_correlated_rela_section(sec);
+		kpatch_compare_correlated_rela_section(sec);
 	else
-		xsplice_compare_correlated_nonrela_section(sec);
+		kpatch_compare_correlated_nonrela_section(sec);
 out:
 	if (sec->status == CHANGED)
 		log_debug("section %s has changed\n", sec->name);
 }
 
-static void xsplice_compare_sections(struct list_head *seclist)
+static void kpatch_compare_sections(struct list_head *seclist)
 {
 	struct section *sec;
 
 	/* compare all sections */
 	list_for_each_entry(sec, seclist, list) {
 		if (sec->twin)
-			xsplice_compare_correlated_section(sec);
+			kpatch_compare_correlated_section(sec);
 		else
 			sec->status = NEW;
 	}
@@ -673,7 +673,7 @@ static void xsplice_compare_sections(struct list_head *seclist)
 	}
 }
 
-static void xsplice_compare_correlated_symbol(struct symbol *sym)
+static void kpatch_compare_correlated_symbol(struct symbol *sym)
 {
 	struct symbol *sym1 = sym, *sym2 = sym->twin;
 
@@ -709,13 +709,13 @@ static void xsplice_compare_correlated_symbol(struct symbol *sym)
 	 */
 }
 
-static void xsplice_compare_symbols(struct list_head *symlist)
+static void kpatch_compare_symbols(struct list_head *symlist)
 {
 	struct symbol *sym;
 
 	list_for_each_entry(sym, symlist, list) {
 		if (sym->twin)
-			xsplice_compare_correlated_symbol(sym);
+			kpatch_compare_correlated_symbol(sym);
 		else
 			sym->status = NEW;
 
@@ -723,16 +723,16 @@ static void xsplice_compare_symbols(struct list_head *symlist)
 	}
 }
 
-static void xsplice_compare_correlated_elements(struct xsplice_elf *kelf)
+static void kpatch_compare_correlated_elements(struct kpatch_elf *kelf)
 {
 	/* lists are already correlated at this point */
 	log_debug("Compare sections\n");
-	xsplice_compare_sections(&kelf->sections);
+	kpatch_compare_sections(&kelf->sections);
 	log_debug("Compare symbols\n");
-	xsplice_compare_symbols(&kelf->symbols);
+	kpatch_compare_symbols(&kelf->symbols);
 }
 
-static void xsplice_mark_ignored_functions_same(struct xsplice_elf *kelf)
+static void kpatch_mark_ignored_functions_same(struct kpatch_elf *kelf)
 {
 	struct section *sec;
 	struct rela *rela;
@@ -748,7 +748,7 @@ static void xsplice_mark_ignored_functions_same(struct xsplice_elf *kelf)
 			ERROR("expected function symbol");
 		log_normal("ignoring function: %s\n", rela->sym->name);
 		if (rela->sym->status != CHANGED)
-			log_normal("NOTICE: no change detected in function %s, unnecessary XSPLICE_IGNORE_FUNCTION()?\n", rela->sym->name);
+			log_normal("NOTICE: no change detected in function %s, unnecessary KPATCH_IGNORE_FUNCTION()?\n", rela->sym->name);
 		rela->sym->status = SAME;
 		rela->sym->sec->status = SAME;
 		if (rela->sym->sec->secsym)
@@ -758,7 +758,7 @@ static void xsplice_mark_ignored_functions_same(struct xsplice_elf *kelf)
 	}
 }
 
-static void xsplice_mark_ignored_sections(struct xsplice_elf *kelf)
+static void kpatch_mark_ignored_sections(struct kpatch_elf *kelf)
 {
 	struct section *sec, *strsec, *ignoresec;
 	struct rela *rela;
@@ -773,20 +773,20 @@ static void xsplice_mark_ignored_sections(struct xsplice_elf *kelf)
 		strsec->status = CHANGED;
 		/*
 		 * Include the string section here.  This is because the
-		 * XSPLICE_IGNORE_SECTION() macro is passed a literal string
+		 * KPATCH_IGNORE_SECTION() macro is passed a literal string
 		 * by the patch author, resulting in a change to the string
 		 * section.  If we don't include it, then we will potentially
 		 * get a "changed section not included" error in
-		 * xsplice_verify_patchability() if no other function based change
+		 * kpatch_verify_patchability() if no other function based change
 		 * also changes the string section.  We could try to exclude each
-		 * literal string added to the section by XSPLICE_IGNORE_SECTION()
+		 * literal string added to the section by KPATCH_IGNORE_SECTION()
 		 * from the section data comparison, but this is a simpler way.
 		 */
 		strsec->include = 1;
 		name = strsec->data->d_buf + rela->addend;
 		ignoresec = find_section_by_name(&kelf->sections, name);
 		if (!ignoresec)
-			ERROR("XSPLICE_IGNORE_SECTION: can't find %s", name);
+			ERROR("KPATCH_IGNORE_SECTION: can't find %s", name);
 		log_normal("ignoring section: %s\n", name);
 		if (is_rela_section(ignoresec))
 			ignoresec = ignoresec->base;
@@ -796,7 +796,7 @@ static void xsplice_mark_ignored_sections(struct xsplice_elf *kelf)
 	}
 }
 
-static void xsplice_mark_ignored_sections_same(struct xsplice_elf *kelf)
+static void kpatch_mark_ignored_sections_same(struct kpatch_elf *kelf)
 {
 	struct section *sec;
 	struct symbol *sym;
@@ -817,7 +817,7 @@ static void xsplice_mark_ignored_sections_same(struct xsplice_elf *kelf)
 	}
 }
 
-static void xsplice_mark_constant_labels_same(struct xsplice_elf *kelf)
+static void kpatch_mark_constant_labels_same(struct kpatch_elf *kelf)
 {
 	struct symbol *sym;
 
@@ -827,19 +827,19 @@ static void xsplice_mark_constant_labels_same(struct xsplice_elf *kelf)
 	}
 }
 
-static int bug_frames_0_group_size(struct xsplice_elf *kelf, int offset) { return 8; }
-static int bug_frames_1_group_size(struct xsplice_elf *kelf, int offset) { return 8; }
-static int bug_frames_2_group_size(struct xsplice_elf *kelf, int offset) { return 8; }
-static int bug_frames_3_group_size(struct xsplice_elf *kelf, int offset) { return 16; }
-static int ex_table_group_size(struct xsplice_elf *kelf, int offset) { return 8; }
-static int altinstructions_group_size(struct xsplice_elf *kelf, int offset) { return 12; }
+static int bug_frames_0_group_size(struct kpatch_elf *kelf, int offset) { return 8; }
+static int bug_frames_1_group_size(struct kpatch_elf *kelf, int offset) { return 8; }
+static int bug_frames_2_group_size(struct kpatch_elf *kelf, int offset) { return 8; }
+static int bug_frames_3_group_size(struct kpatch_elf *kelf, int offset) { return 16; }
+static int ex_table_group_size(struct kpatch_elf *kelf, int offset) { return 8; }
+static int altinstructions_group_size(struct kpatch_elf *kelf, int offset) { return 12; }
 
 /*
  * The rela groups in the .fixup section vary in size.  The beginning of each
  * .fixup rela group is referenced by the .ex_table section. To find the size
  * of a .fixup rela group, we have to traverse the .ex_table relas.
  */
-static int fixup_group_size(struct xsplice_elf *kelf, int offset)
+static int fixup_group_size(struct kpatch_elf *kelf, int offset)
 {
 	struct section *sec;
 	struct rela *rela;
@@ -934,9 +934,9 @@ static int should_keep_rela_group(struct section *sec, int start, int size)
 	return found;
 }
 
-static void xsplice_regenerate_special_section(struct xsplice_elf *kelf,
-				               struct special_section *special,
-				               struct section *sec)
+static void kpatch_regenerate_special_section(struct kpatch_elf *kelf,
+				              struct special_section *special,
+				              struct section *sec)
 {
 	struct rela *rela, *safe;
 	char *src, *dest;
@@ -1010,13 +1010,13 @@ static void xsplice_regenerate_special_section(struct xsplice_elf *kelf,
 	 * Update text section data buf and size.
 	 *
 	 * The rela section's data buf and size will be regenerated in
-	 * xsplice_rebuild_rela_section_data().
+	 * kpatch_rebuild_rela_section_data().
 	 */
 	sec->base->data->d_buf = dest;
 	sec->base->data->d_size = dest_offset;
 }
 
-static void xsplice_process_special_sections(struct xsplice_elf *kelf)
+static void kpatch_process_special_sections(struct kpatch_elf *kelf)
 {
 	struct special_section *special;
 	struct section *sec;
@@ -1032,7 +1032,7 @@ static void xsplice_process_special_sections(struct xsplice_elf *kelf)
 		if (!sec)
 			continue;
 
-		xsplice_regenerate_special_section(kelf, special, sec);
+		kpatch_regenerate_special_section(kelf, special, sec);
 	}
 
 	/*
@@ -1061,7 +1061,7 @@ static void xsplice_process_special_sections(struct xsplice_elf *kelf)
 	}
 }
 
-static void xsplice_include_standard_elements(struct xsplice_elf *kelf)
+static void kpatch_include_standard_elements(struct kpatch_elf *kelf)
 {
 	struct section *sec;
 
@@ -1084,7 +1084,7 @@ static void xsplice_include_standard_elements(struct xsplice_elf *kelf)
 #define inc_printf(fmt, ...) \
 	log_debug("%*s" fmt, recurselevel, "", ##__VA_ARGS__);
 
-static void xsplice_include_symbol(struct symbol *sym, int recurselevel)
+static void kpatch_include_symbol(struct symbol *sym, int recurselevel)
 {
 	struct rela *rela;
 	struct section *sec;
@@ -1112,13 +1112,13 @@ static void xsplice_include_symbol(struct symbol *sym, int recurselevel)
 	sec->rela->include = 1;
 	inc_printf("section %s is included\n", sec->rela->name);
 	list_for_each_entry(rela, &sec->rela->relas, list)
-		xsplice_include_symbol(rela->sym, recurselevel+1);
+		kpatch_include_symbol(rela->sym, recurselevel+1);
 out:
 	inc_printf("end include_symbol(%s)\n", sym->name);
 	return;
 }
 
-static int xsplice_include_changed_functions(struct xsplice_elf *kelf)
+static int kpatch_include_changed_functions(struct kpatch_elf *kelf)
 {
 	struct symbol *sym;
 	int changed_nr = 0;
@@ -1129,7 +1129,7 @@ static int xsplice_include_changed_functions(struct xsplice_elf *kelf)
 		if (sym->status == CHANGED &&
 		    sym->type == STT_FUNC) {
 			changed_nr++;
-			xsplice_include_symbol(sym, 0);
+			kpatch_include_symbol(sym, 0);
 		}
 
 		if (sym->type == STT_FILE)
@@ -1139,7 +1139,7 @@ static int xsplice_include_changed_functions(struct xsplice_elf *kelf)
 	return changed_nr;
 }
 
-static void xsplice_include_debug_sections(struct xsplice_elf *kelf)
+static void kpatch_include_debug_sections(struct kpatch_elf *kelf)
 {
 	struct section *sec;
 	struct rela *rela, *saferela;
@@ -1166,7 +1166,7 @@ static void xsplice_include_debug_sections(struct xsplice_elf *kelf)
 	}
 }
 
-static void xsplice_include_hook_elements(struct xsplice_elf *kelf)
+static void kpatch_include_hook_elements(struct kpatch_elf *kelf)
 {
 	struct section *sec;
 	struct symbol *sym;
@@ -1185,7 +1185,7 @@ static void xsplice_include_hook_elements(struct xsplice_elf *kelf)
 			                         struct rela, list);
 				sym = rela->sym;
 				log_normal("found hook: %s\n",sym->name);
-				xsplice_include_symbol(sym, 0);
+				kpatch_include_symbol(sym, 0);
 				/* strip the hook symbol */
 				sym->include = 0;
 				sym->sec->sym = NULL;
@@ -1199,7 +1199,7 @@ static void xsplice_include_hook_elements(struct xsplice_elf *kelf)
 
 	/*
 	 * Strip temporary global load/unload function pointer objects
-	 * used by the xsplice_[load|unload]() macros.
+	 * used by the kpatch_[load|unload]() macros.
 	 */
 	list_for_each_entry(sym, &kelf->symbols, list)
 		if (!strcmp(sym->name, "xsplice_load_data") ||
@@ -1207,7 +1207,7 @@ static void xsplice_include_hook_elements(struct xsplice_elf *kelf)
 			sym->include = 0;
 }
 
-static int xsplice_include_new_globals(struct xsplice_elf *kelf)
+static int kpatch_include_new_globals(struct kpatch_elf *kelf)
 {
 	struct symbol *sym;
 	int nr = 0;
@@ -1215,7 +1215,7 @@ static int xsplice_include_new_globals(struct xsplice_elf *kelf)
 	list_for_each_entry(sym, &kelf->symbols, list) {
 		if (sym->bind == STB_GLOBAL && sym->sec &&
 		    sym->status == NEW) {
-			xsplice_include_symbol(sym, 0);
+			kpatch_include_symbol(sym, 0);
 			nr++;
 		}
 	}
@@ -1223,7 +1223,7 @@ static int xsplice_include_new_globals(struct xsplice_elf *kelf)
 	return nr;
 }
 
-static void xsplice_print_changes(struct xsplice_elf *kelf)
+static void kpatch_print_changes(struct kpatch_elf *kelf)
 {
 	struct symbol *sym;
 
@@ -1237,7 +1237,7 @@ static void xsplice_print_changes(struct xsplice_elf *kelf)
 	}
 }
 
-static void xsplice_verify_patchability(struct xsplice_elf *kelf)
+static void kpatch_verify_patchability(struct kpatch_elf *kelf)
 {
 	struct section *sec;
 	int errs = 0;
@@ -1278,12 +1278,12 @@ static void xsplice_verify_patchability(struct xsplice_elf *kelf)
 		DIFF_FATAL("%d unsupported section change(s)", errs);
 }
 
-static void xsplice_migrate_included_elements(struct xsplice_elf *kelf,
-					      struct xsplice_elf **kelfout)
+static void kpatch_migrate_included_elements(struct kpatch_elf *kelf,
+					     struct kpatch_elf **kelfout)
 {
 	struct section *sec, *safesec;
 	struct symbol *sym, *safesym;
-	struct xsplice_elf *out;
+	struct kpatch_elf *out;
 
 	/* allocate output kelf */
 	out = malloc(sizeof(*out));
@@ -1322,9 +1322,9 @@ static void xsplice_migrate_included_elements(struct xsplice_elf *kelf,
 	*kelfout = out;
 }
 
-static void xsplice_migrate_symbols(struct list_head *src,
-				    struct list_head *dst,
-				    int (*select)(struct symbol *))
+static void kpatch_migrate_symbols(struct list_head *src,
+				   struct list_head *dst,
+				   int (*select)(struct symbol *))
 {
 	struct symbol *sym, *safe;
 
@@ -1337,12 +1337,12 @@ static void xsplice_migrate_symbols(struct list_head *src,
 	}
 }
 
-static void xsplice_create_strings_elements(struct xsplice_elf *kelf)
+static void kpatch_create_strings_elements(struct kpatch_elf *kelf)
 {
 	struct section *sec;
 	struct symbol *sym;
 
-	/* create .xsplice.strings */
+	/* create .kpatch.strings */
 
 	/* allocate section resources */
 	ALLOC_LINK(sec, &kelf->sections);
@@ -1360,7 +1360,7 @@ static void xsplice_create_strings_elements(struct xsplice_elf *kelf)
 	sec->sh.sh_addralign = 1;
 	sec->sh.sh_flags = SHF_ALLOC;
 
-	/* create .xsplice.strings section symbol (reuse sym variable) */
+	/* create .kpatch.strings section symbol (reuse sym variable) */
 
 	ALLOC_LINK(sym, &kelf->symbols);
 	sym->sec = sec;
@@ -1370,7 +1370,7 @@ static void xsplice_create_strings_elements(struct xsplice_elf *kelf)
 	sym->name = ".xsplice.strings";
 }
 
-static void xsplice_build_strings_section_data(struct xsplice_elf *kelf)
+static void kpatch_build_strings_section_data(struct kpatch_elf *kelf)
 {
 	struct string *string;
 	struct section *sec;
@@ -1379,7 +1379,7 @@ static void xsplice_build_strings_section_data(struct xsplice_elf *kelf)
 
 	sec = find_section_by_name(&kelf->sections, ".xsplice.strings");
 	if (!sec)
-		ERROR("can't find .xsplice.strings");
+		ERROR("can't find .kpatch.strings");
 
 	/* determine size */
 	size = 0;
@@ -1420,7 +1420,7 @@ static char *mangle_local_symbol(char *filename, char *symname)
  * Rename local symbols to the filename#symbol format used by Xen's "special"
  * symbol table.
  */
-static void xsplice_rename_local_symbols(struct xsplice_elf *kelf, char *hint)
+static void xsplice_rename_local_symbols(struct kpatch_elf *kelf, char *hint)
 {
 	struct symbol *sym;
 
@@ -1440,7 +1440,7 @@ static void xsplice_rename_local_symbols(struct xsplice_elf *kelf, char *hint)
 	}
 }
 
-static struct section *create_section_pair(struct xsplice_elf *kelf,
+static struct section *create_section_pair(struct kpatch_elf *kelf,
 					   char *name, int entsize, int nr)
 {
 	char *relaname;
@@ -1480,7 +1480,7 @@ static struct section *create_section_pair(struct xsplice_elf *kelf,
 	relasec->base = sec;
 	INIT_LIST_HEAD(&relasec->relas);
 
-	/* set data, buffers generated by xsplice_rebuild_rela_section_data() */
+	/* set data, buffers generated by kpatch_rebuild_rela_section_data() */
 	relasec->data = malloc(sizeof(*relasec->data));
 	if (!relasec->data)
 		ERROR("malloc");
@@ -1496,7 +1496,7 @@ static struct section *create_section_pair(struct xsplice_elf *kelf,
 	return sec;
 }
 
-static void xsplice_create_patches_sections(struct xsplice_elf *kelf,
+static void xsplice_create_patches_sections(struct kpatch_elf *kelf,
 					    struct lookup_table *table,
 					    char *hint, int resolve)
 {
@@ -1605,25 +1605,25 @@ static int is_local_func_sym(struct symbol *sym)
 	return sym->bind == STB_LOCAL && sym->type == STT_FUNC;
 }
 
-static void xsplice_reorder_symbols(struct xsplice_elf *kelf)
+static void kpatch_reorder_symbols(struct kpatch_elf *kelf)
 {
 	LIST_HEAD(symbols);
 
 	/* migrate NULL sym */
-	xsplice_migrate_symbols(&kelf->symbols, &symbols, is_null_sym);
+	kpatch_migrate_symbols(&kelf->symbols, &symbols, is_null_sym);
 	/* migrate LOCAL FILE sym */
-	xsplice_migrate_symbols(&kelf->symbols, &symbols, is_file_sym);
+	kpatch_migrate_symbols(&kelf->symbols, &symbols, is_file_sym);
 	/* migrate LOCAL FUNC syms */
-	xsplice_migrate_symbols(&kelf->symbols, &symbols, is_local_func_sym);
+	kpatch_migrate_symbols(&kelf->symbols, &symbols, is_local_func_sym);
 	/* migrate all other LOCAL syms */
-	xsplice_migrate_symbols(&kelf->symbols, &symbols, is_local_sym);
+	kpatch_migrate_symbols(&kelf->symbols, &symbols, is_local_sym);
 	/* migrate all other (GLOBAL) syms */
-	xsplice_migrate_symbols(&kelf->symbols, &symbols, NULL);
+	kpatch_migrate_symbols(&kelf->symbols, &symbols, NULL);
 
 	list_replace(&symbols, &kelf->symbols);
 }
 
-static void xsplice_reindex_elements(struct xsplice_elf *kelf)
+static void kpatch_reindex_elements(struct kpatch_elf *kelf)
 {
 	struct section *sec;
 	struct symbol *sym;
@@ -1692,7 +1692,7 @@ static struct argp argp = { options, parse_opt, args_doc, 0 };
 
 int main(int argc, char *argv[])
 {
-	struct xsplice_elf *kelf_base, *kelf_patched, *kelf_out;
+	struct kpatch_elf *kelf_base, *kelf_patched, *kelf_out;
 	struct arguments arguments;
 	int num_changed, new_globals_exist;
 	struct lookup_table *lookup;
@@ -1711,30 +1711,30 @@ int main(int argc, char *argv[])
 	childobj = basename(arguments.args[0]);
 
 	log_debug("Open base\n");
-	kelf_base = xsplice_elf_open(arguments.args[0]);
+	kelf_base = kpatch_elf_open(arguments.args[0]);
 	log_debug("Open patched\n");
-	kelf_patched = xsplice_elf_open(arguments.args[1]);
+	kelf_patched = kpatch_elf_open(arguments.args[1]);
 
 	log_debug("Compare elf headers\n");
-	xsplice_compare_elf_headers(kelf_base->elf, kelf_patched->elf);
+	kpatch_compare_elf_headers(kelf_base->elf, kelf_patched->elf);
 	log_debug("Check program headers of base\n");
-	xsplice_check_program_headers(kelf_base->elf);
+	kpatch_check_program_headers(kelf_base->elf);
 	log_debug("Check program headers of patched\n");
-	xsplice_check_program_headers(kelf_patched->elf);
+	kpatch_check_program_headers(kelf_patched->elf);
 
 	log_debug("Mark grouped sections\n");
-	xsplice_mark_grouped_sections(kelf_patched);
+	kpatch_mark_grouped_sections(kelf_patched);
 	log_debug("Replace sections syms base\n");
-	xsplice_replace_sections_syms(kelf_base);
+	kpatch_replace_sections_syms(kelf_base);
 	log_debug("Replace sections syms patched\n");
-	xsplice_replace_sections_syms(kelf_patched);
+	kpatch_replace_sections_syms(kelf_patched);
 	log_debug("Rename mangled functions\n");
-	xsplice_rename_mangled_functions(kelf_base, kelf_patched);
+	kpatch_rename_mangled_functions(kelf_base, kelf_patched);
 
 	log_debug("Correlate elfs\n");
-	xsplice_correlate_elfs(kelf_base, kelf_patched);
+	kpatch_correlate_elfs(kelf_base, kelf_patched);
 	log_debug("Correlate static local variables\n");
-	xsplice_correlate_static_local_variables(kelf_base, kelf_patched);
+	kpatch_correlate_static_local_variables(kelf_base, kelf_patched);
 
 	/*
 	 * After this point, we don't care about kelf_base anymore.
@@ -1742,38 +1742,38 @@ int main(int argc, char *argv[])
 	 * section, symbol, and rela lists of kelf_patched.
 	 */
 	log_debug("Mark ignored sections\n");
-	xsplice_mark_ignored_sections(kelf_patched);
+	kpatch_mark_ignored_sections(kelf_patched);
 	log_debug("Compare correlated elements\n");
-	xsplice_compare_correlated_elements(kelf_patched);
+	kpatch_compare_correlated_elements(kelf_patched);
 	log_debug("Elf teardown base\n");
-	xsplice_elf_teardown(kelf_base);
+	kpatch_elf_teardown(kelf_base);
 	log_debug("Elf free base\n");
-	xsplice_elf_free(kelf_base);
+	kpatch_elf_free(kelf_base);
 
 	log_debug("Mark ignored functions same\n");
-	xsplice_mark_ignored_functions_same(kelf_patched);
+	kpatch_mark_ignored_functions_same(kelf_patched);
 	log_debug("Mark ignored sections same\n");
-	xsplice_mark_ignored_sections_same(kelf_patched);
+	kpatch_mark_ignored_sections_same(kelf_patched);
 	log_debug("Mark constant labels same\n");
-	xsplice_mark_constant_labels_same(kelf_patched);
+	kpatch_mark_constant_labels_same(kelf_patched);
 
 	log_debug("Include standard elements\n");
-	xsplice_include_standard_elements(kelf_patched);
+	kpatch_include_standard_elements(kelf_patched);
 	log_debug("Include changed functions\n");
-	num_changed = xsplice_include_changed_functions(kelf_patched);
+	num_changed = kpatch_include_changed_functions(kelf_patched);
 	log_debug("num_changed = %d\n", num_changed);
 	log_debug("Include debug sections\n");
-	xsplice_include_debug_sections(kelf_patched);
+	kpatch_include_debug_sections(kelf_patched);
 	log_debug("Include hook elements\n");
-	xsplice_include_hook_elements(kelf_patched);
+	kpatch_include_hook_elements(kelf_patched);
 	log_debug("Include new globals\n");
-	new_globals_exist = xsplice_include_new_globals(kelf_patched);
+	new_globals_exist = kpatch_include_new_globals(kelf_patched);
 	log_debug("new_globals_exist = %d\n", new_globals_exist);
 
 	log_debug("Print changes\n");
-	xsplice_print_changes(kelf_patched);
+	kpatch_print_changes(kelf_patched);
 	log_debug("Dump patched elf status\n");
-	xsplice_dump_kelf(kelf_patched);
+	kpatch_dump_kelf(kelf_patched);
 
 	if (!num_changed && !new_globals_exist) {
 		log_debug("no changed functions were found\n");
@@ -1781,22 +1781,22 @@ int main(int argc, char *argv[])
 	}
 
 	log_debug("Process special sections\n");
-	xsplice_process_special_sections(kelf_patched);
+	kpatch_process_special_sections(kelf_patched);
 	log_debug("Verify patchability\n");
-	xsplice_verify_patchability(kelf_patched);
+	kpatch_verify_patchability(kelf_patched);
 
 	/* this is destructive to kelf_patched */
 	log_debug("Migrate included elements\n");
-	xsplice_migrate_included_elements(kelf_patched, &kelf_out);
+	kpatch_migrate_included_elements(kelf_patched, &kelf_out);
 
 	/*
 	 * Teardown kelf_patched since we shouldn't access sections or symbols
 	 * through it anymore.  Don't free however, since our section and symbol
 	 * name fields still point to strings in the Elf object owned by
-	 * xsplice_patched.
+	 * kpatch_patched.
 	 */
 	log_debug("Elf teardown patched\n");
-	xsplice_elf_teardown(kelf_patched);
+	kpatch_elf_teardown(kelf_patched);
 
 	log_debug("Search for source file name\n");
 	list_for_each_entry(sym, &kelf_out->symbols, list) {
@@ -1815,11 +1815,11 @@ int main(int argc, char *argv[])
 
 	/* create strings, patches, and dynrelas sections */
 	log_debug("Create strings elements\n");
-	xsplice_create_strings_elements(kelf_out);
+	kpatch_create_strings_elements(kelf_out);
 	log_debug("Create patches sections\n");
 	xsplice_create_patches_sections(kelf_out, lookup, hint,
 			                arguments.resolve);
-	xsplice_build_strings_section_data(kelf_out);
+	kpatch_build_strings_section_data(kelf_out);
 
 	log_debug("Rename local symbols\n");
 	xsplice_rename_local_symbols(kelf_out, hint);
@@ -1832,9 +1832,9 @@ int main(int argc, char *argv[])
 	 *  throughout the structure.
 	 */
 	log_debug("Reorder symbols\n");
-	xsplice_reorder_symbols(kelf_out);
+	kpatch_reorder_symbols(kelf_out);
 	log_debug("Reindex elements\n");
-	xsplice_reindex_elements(kelf_out);
+	kpatch_reindex_elements(kelf_out);
 
 	/*
 	 * Update rela section headers and rebuild the rela section data
@@ -1847,26 +1847,26 @@ int main(int argc, char *argv[])
 		sec->sh.sh_link = symtab->index;
 		sec->sh.sh_info = sec->base->index;
 		log_debug("Rebuild rela section data for %s\n", sec->name);
-		xsplice_rebuild_rela_section_data(sec);
+		kpatch_rebuild_rela_section_data(sec);
 	}
 
 	log_debug("Create shstrtab\n");
-	xsplice_create_shstrtab(kelf_out);
+	kpatch_create_shstrtab(kelf_out);
 	log_debug("Create strtab\n");
-	xsplice_create_strtab(kelf_out);
+	kpatch_create_strtab(kelf_out);
 	log_debug("Create symtab\n");
-	xsplice_create_symtab(kelf_out);
+	kpatch_create_symtab(kelf_out);
 	log_debug("Dump out elf status\n");
-	xsplice_dump_kelf(kelf_out);
+	kpatch_dump_kelf(kelf_out);
 	log_debug("Write out elf\n");
-	xsplice_write_output_elf(kelf_out, kelf_patched->elf, arguments.args[3]);
+	kpatch_write_output_elf(kelf_out, kelf_patched->elf, arguments.args[3]);
 
 	log_debug("Elf free patched\n");
-	xsplice_elf_free(kelf_patched);
+	kpatch_elf_free(kelf_patched);
 	log_debug("Elf teardown out\n");
-	xsplice_elf_teardown(kelf_out);
+	kpatch_elf_teardown(kelf_out);
 	log_debug("Elf free out\n");
-	xsplice_elf_free(kelf_out);
+	kpatch_elf_free(kelf_out);
 
 	return 0;
 }

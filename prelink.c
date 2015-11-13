@@ -40,8 +40,8 @@ char *childobj;
 enum loglevel loglevel = NORMAL;
 
 /* Resolve symbols using xen-syms */
-void xsplice_resolve_symbols(struct xsplice_elf *kelf,
-                            struct lookup_table *table)
+void xsplice_resolve_symbols(struct kpatch_elf *kelf,
+			     struct lookup_table *table)
 {
 	struct symbol *sym;
 	struct lookup_result result;
@@ -135,7 +135,7 @@ static struct argp argp = { options, parse_opt, args_doc, 0 };
 
 int main(int argc, char *argv[])
 {
-	struct xsplice_elf *kelf;
+	struct kpatch_elf *kelf;
 	struct arguments arguments;
 	struct lookup_table *lookup;
 	struct section *sec, *symtab;
@@ -150,7 +150,7 @@ int main(int argc, char *argv[])
 	childobj = basename(arguments.args[0]);
 
 	log_debug("Open elf\n");
-	kelf = xsplice_elf_open(arguments.args[0]);
+	kelf = kpatch_elf_open(arguments.args[0]);
 
 	/* create symbol lookup table */
 	log_debug("Lookup xen-syms\n");
@@ -170,26 +170,26 @@ int main(int argc, char *argv[])
 		sec->sh.sh_link = symtab->index;
 		sec->sh.sh_info = sec->base->index;
 		log_debug("Rebuild rela section data for %s\n", sec->name);
-		xsplice_rebuild_rela_section_data(sec);
+		kpatch_rebuild_rela_section_data(sec);
 	}
 
 	log_debug("Create shstrtab\n");
-	xsplice_create_shstrtab(kelf);
+	kpatch_create_shstrtab(kelf);
 	log_debug("Create strtab\n");
-	xsplice_create_strtab(kelf);
+	kpatch_create_strtab(kelf);
 	log_debug("Create symtab\n");
-	xsplice_create_symtab(kelf);
+	kpatch_create_symtab(kelf);
 
 	log_debug("Dump elf status\n");
-	xsplice_dump_kelf(kelf);
+	kpatch_dump_kelf(kelf);
 
 	log_debug("Write out elf\n");
-	xsplice_write_output_elf(kelf, kelf->elf, arguments.args[1]);
+	kpatch_write_output_elf(kelf, kelf->elf, arguments.args[1]);
 
 	log_debug("Elf teardown\n");
-	xsplice_elf_teardown(kelf);
+	kpatch_elf_teardown(kelf);
 	log_debug("Elf free\n");
-	xsplice_elf_free(kelf);
+	kpatch_elf_free(kelf);
 
 	return 0;
 }

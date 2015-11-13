@@ -106,7 +106,7 @@ struct string {
 	char *name;
 };
 
-struct xsplice_elf {
+struct kpatch_elf {
 	Elf *elf;
 	struct list_head sections;
 	struct list_head symbols;
@@ -127,19 +127,19 @@ struct xsplice_patch_func {
 
 struct special_section {
 	char *name;
-	int (*group_size)(struct xsplice_elf *kelf, int offset);
+	int (*group_size)(struct kpatch_elf *kelf, int offset);
 };
 
-struct xsplice_elf *xsplice_elf_open(const char *name);
-void xsplice_elf_free(struct xsplice_elf *kelf);
-void xsplice_elf_teardown(struct xsplice_elf *kelf);
-void xsplice_write_output_elf(struct xsplice_elf *kelf,
+struct kpatch_elf *kpatch_elf_open(const char *name);
+void kpatch_elf_free(struct kpatch_elf *kelf);
+void kpatch_elf_teardown(struct kpatch_elf *kelf);
+void kpatch_write_output_elf(struct kpatch_elf *kelf,
 			      Elf *elf, char *outfile);
-void xsplice_dump_kelf(struct xsplice_elf *kelf);
-void xsplice_create_symtab(struct xsplice_elf *kelf);
-void xsplice_create_strtab(struct xsplice_elf *kelf);
-void xsplice_create_shstrtab(struct xsplice_elf *kelf);
-void xsplice_rebuild_rela_section_data(struct section *sec);
+void kpatch_dump_kelf(struct kpatch_elf *kelf);
+void kpatch_create_symtab(struct kpatch_elf *kelf);
+void kpatch_create_strtab(struct kpatch_elf *kelf);
+void kpatch_create_shstrtab(struct kpatch_elf *kelf);
+void kpatch_rebuild_rela_section_data(struct section *sec);
 
 struct section *find_section_by_index(struct list_head *list, unsigned int index);
 struct section *find_section_by_name(struct list_head *list, const char *name);
