@@ -122,7 +122,7 @@ struct xsplice_patch_func {
 	unsigned long old_addr;
 	unsigned long old_size;
 	char *name;
-	unsigned char pad[64];
+	unsigned char undo[8];
 };
 
 struct special_section {
