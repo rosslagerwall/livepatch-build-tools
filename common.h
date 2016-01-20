@@ -117,12 +117,12 @@ struct kpatch_elf {
 #define PATCH_INSN_SIZE 5
 
 struct xsplice_patch_func {
-	unsigned long new_addr;
-	unsigned long new_size;
-	unsigned long old_addr;
-	unsigned long old_size;
 	char *name;
-	unsigned char undo[8];
+	unsigned long new_addr;
+	unsigned long old_addr;
+	uint32_t new_size;
+	uint32_t old_size;
+	unsigned char pad[32];
 };
 
 struct special_section {

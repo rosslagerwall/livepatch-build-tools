@@ -1669,6 +1669,7 @@ static void xsplice_create_patches_sections(struct kpatch_elf *kelf,
 				ERROR("%s too small to patch", sym->name);
 
 			/* add entry in text section */
+			funcs[index].name = NULL;
 			if (resolve)
 				funcs[index].old_addr = result.value;
 			else
@@ -1677,7 +1678,7 @@ static void xsplice_create_patches_sections(struct kpatch_elf *kelf,
 			funcs[index].old_size = result.size;
 			funcs[index].new_addr = 0;
 			funcs[index].new_size = sym->sym.st_size;
-			memset(funcs[index].undo, 0, sizeof funcs[index].undo);
+			memset(funcs[index].pad, 0, sizeof funcs[index].pad);
 
 			/*
 			 * Add a relocation that will populate
@@ -1689,6 +1690,8 @@ static void xsplice_create_patches_sections(struct kpatch_elf *kelf,
 			rela->type = R_X86_64_64;
 			rela->addend = 0;
 			rela->offset = index * sizeof(*funcs);
+			rela->offset = index * sizeof(*funcs) +
+			               offsetof(struct xsplice_patch_func, new_addr);
 
 			/*
 			 * Add a relocation that will populate
