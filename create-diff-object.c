@@ -36,6 +36,7 @@
  * the output object.
  */
 
+#define _GNU_SOURCE
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
@@ -45,6 +46,7 @@
 #include <argp.h>
 #include <error.h>
 #include <unistd.h>
+#include <time.h>
 #include <gelf.h>
 
 #include "list.h"
@@ -1521,6 +1523,23 @@ static void kpatch_build_strings_section_data(struct kpatch_elf *kelf)
 	}
 }
 
+/*
+ * If __func__ is used, it generates a symbol like __func__.5432
+ * Since this is always included (see is_special_static), it will generate
+ * duplicate symbol conflicts if GCC happens to use the same number (which
+ * happens quite often since it doesn't appear to be random). To work around
+ * this, rename the symbol to use a completely random number.
+ */
+static char *rename_func_symbol(void)
+{
+	char *s;
+
+	if (asprintf(&s, "__func__.%d", rand()) == -1)
+		ERROR("malloc");
+
+	return s;
+}
+
 static char *mangle_local_symbol(char *filename, char *symname)
 {
 	char *s, *ptr;
@@ -1556,6 +1575,8 @@ static void xsplice_rename_local_symbols(struct kpatch_elf *kelf, char *hint)
 		if (sym->bind != STB_LOCAL)
 			continue;
 
+                if (!strncmp(sym->name, "__func__.", 9))
+                    sym->name = rename_func_symbol();
 		sym->name = mangle_local_symbol(hint, sym->name);
 		log_debug("Local symbol mangled to: %s\n", sym->name);
 	}
@@ -1823,6 +1844,8 @@ int main(int argc, char *argv[])
 	struct section *sec, *symtab;
 	struct symbol *sym;
 	char *hint = NULL;
+
+	srand(time(NULL));
 
 	arguments.debug = 0;
 	arguments.resolve = 0;
