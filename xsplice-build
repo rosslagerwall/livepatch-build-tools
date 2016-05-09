@@ -140,7 +140,7 @@ function create_patch()
     # Create a dependency section
     > depends.bin
     if [ -n "$DEPENDS" ]; then
-        perl -e "print pack 'H*', '${DEPENDS}'" >> depends.bin
+        perl -e "print pack 'VVVZ*H*', 4, 20, 3, 'GNU', '${DEPENDS}'" >> depends.bin
     fi
 
     echo "Creating patch module..."
