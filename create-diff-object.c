@@ -1699,6 +1699,7 @@ static void xsplice_create_patches_sections(struct kpatch_elf *kelf,
 			funcs[index].old_size = result.size;
 			funcs[index].new_addr = 0;
 			funcs[index].new_size = sym->sym.st_size;
+			funcs[index].version = 1;
 			memset(funcs[index].pad, 0, sizeof funcs[index].pad);
 
 			/*
