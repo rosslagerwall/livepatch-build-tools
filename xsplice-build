@@ -138,10 +138,7 @@ function create_patch()
     fi
 
     # Create a dependency section
-    > depends.bin
-    if [ -n "$DEPENDS" ]; then
-        perl -e "print pack 'VVVZ*H*', 4, 20, 3, 'GNU', '${DEPENDS}'" >> depends.bin
-    fi
+    perl -e "print pack 'VVVZ*H*', 4, 20, 3, 'GNU', '${DEPENDS}'" > depends.bin
 
     echo "Creating patch module..."
     if [ -z "$PRELINK" ]; then
@@ -239,6 +236,7 @@ done
 [ -z "$srcarg" ] && die "Xen directory not given"
 [ -z "$patcharg" ] && die "Patchfile not given"
 [ -z "$outputarg" ] && die "Output directory not given"
+[ -z "$DEPENDS" ] && die "Build-id dependency not given"
 
 SRCDIR="$(realpath -m -- "$srcarg")"
 PATCHFILE="$(realpath -m -- "$patcharg")"
