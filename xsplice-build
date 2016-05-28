@@ -213,7 +213,7 @@ while [[ $# -gt 0 ]]; do
             ;;
         --xen-syms)
             shift
-            XENSYMS="$(realpath -m -- "$1")"
+            XENSYMS="$(readlink -m -- "$1")"
             [ -f "$XENSYMS" ] || die "xen-syms file does not exist"
             shift
             ;;
@@ -238,9 +238,9 @@ done
 [ -z "$outputarg" ] && die "Output directory not given"
 [ -z "$DEPENDS" ] && die "Build-id dependency not given"
 
-SRCDIR="$(realpath -m -- "$srcarg")"
-PATCHFILE="$(realpath -m -- "$patcharg")"
-OUTPUT="$(realpath -m -- "$outputarg")"
+SRCDIR="$(readlink -m -- "$srcarg")"
+PATCHFILE="$(readlink -m -- "$patcharg")"
+OUTPUT="$(readlink -m -- "$outputarg")"
 
 [ -d "${SRCDIR}" ] || die "Xen directory does not exist"
 [ -f "${PATCHFILE}" ] || die "Patchfile does not exist"
