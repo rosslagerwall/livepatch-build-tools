@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# xsplice build script
+# livepatch build script
 #
 # Copyright (C) 2015 Ross Lagerwall <ross.lagerwall@citrix.com>
 #
@@ -39,9 +39,9 @@ if [[ "$TOOLCHAINCMD" = "gcc" ]] ; then
                 ;;
             *.o)
                 path="$(pwd)/$(dirname $obj)"
-                dir="${path#$XSPLICE_BUILD_DIR}"
-                if [ -n "$XSPLICE_CAPTURE_DIR" -a -d "$XSPLICE_CAPTURE_DIR" ]; then
-                    echo "$dir/$obj" >> "${XSPLICE_CAPTURE_DIR}/changed_objs"
+                dir="${path#$LIVEPATCH_BUILD_DIR}"
+                if [ -n "$LIVEPATCH_CAPTURE_DIR" -a -d "$LIVEPATCH_CAPTURE_DIR" ]; then
+                    echo "$dir/$obj" >> "${LIVEPATCH_CAPTURE_DIR}/changed_objs"
                     keep=yes
                 fi
                 break
@@ -59,8 +59,8 @@ fi
 ret="$?"
 
 if [[ "$keep" = "yes" ]] ; then
-    mkdir -p "$(dirname $XSPLICE_CAPTURE_DIR/$dir/$obj)"
-    cp "$obj" "$XSPLICE_CAPTURE_DIR/$dir/$obj"
+    mkdir -p "$(dirname $LIVEPATCH_CAPTURE_DIR/$dir/$obj)"
+    cp "$obj" "$LIVEPATCH_CAPTURE_DIR/$dir/$obj"
 fi
 
 exit "$ret"

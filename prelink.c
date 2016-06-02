@@ -40,7 +40,7 @@ char *childobj;
 enum loglevel loglevel = NORMAL;
 
 /* Resolve symbols using xen-syms */
-void xsplice_resolve_symbols(struct kpatch_elf *kelf,
+void livepatch_resolve_symbols(struct kpatch_elf *kelf,
 			     struct lookup_table *table)
 {
 	struct symbol *sym;
@@ -157,7 +157,7 @@ int main(int argc, char *argv[])
 	lookup = lookup_open(arguments.args[2]);
 
 	log_debug("Resolve symbols\n");
-	xsplice_resolve_symbols(kelf, lookup);
+	livepatch_resolve_symbols(kelf, lookup);
 
 	/*
 	 * Update rela section headers and rebuild the rela section data

@@ -116,7 +116,7 @@ struct kpatch_elf {
 
 #define PATCH_INSN_SIZE 5
 
-struct xsplice_patch_func {
+struct livepatch_patch_func {
 	char *name;
 	unsigned long new_addr;
 	unsigned long old_addr;

@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# xsplice build script
+# livepatch build script
 #
 # Copyright (C) 2014 Seth Jennings <sjenning@redhat.com>
 # Copyright (C) 2013,2014 Josh Poimboeuf <jpoimboe@redhat.com>
@@ -19,7 +19,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
-# This script takes a Xen tree, and a patch and outputs an xsplice
+# This script takes a Xen tree, and a patch and outputs an livepatch
 # module intended to patch Xen at runtime.
 # Large amounts of this script are taken from kpatch's kpatch-build
 # script.
@@ -39,7 +39,7 @@ warn() {
 
 die() {
     if [[ -z $1 ]]; then
-        msg="xSplice build failed"
+        msg="LivePatch build failed"
     else
         msg="$1"
     fi
@@ -78,10 +78,10 @@ function build_special()
     cd "${SRCDIR}" || die
 
     # Capture .o files from the patched build
-    export CROSS_COMPILE="${SCRIPTDIR}/xsplice-gcc "
-    export XSPLICE_BUILD_DIR="$(pwd)/"
-    export XSPLICE_CAPTURE_DIR="$OUTPUT/${name}"
-    mkdir -p "$XSPLICE_CAPTURE_DIR"
+    export CROSS_COMPILE="${SCRIPTDIR}/livepatch-gcc "
+    export LIVEPATCH_BUILD_DIR="$(pwd)/"
+    export LIVEPATCH_CAPTURE_DIR="$OUTPUT/${name}"
+    mkdir -p "$LIVEPATCH_CAPTURE_DIR"
 
     # Build with special GCC flags
     cd "${SRCDIR}/xen" || die
@@ -89,8 +89,8 @@ function build_special()
     make "-j$CPUS" debug="$XEN_DEBUG" &> "${OUTPUT}/build_${name}_compile.log" || die
     sed -i 's/CFLAGS += -nostdinc -ffunction-sections -fdata-sections/CFLAGS += -nostdinc/' Rules.mk
 
-    unset XSPLICE_BUILD_DIR
-    unset XSPLICE_CAPTURE_DIR
+    unset LIVEPATCH_BUILD_DIR
+    unset LIVEPATCH_CAPTURE_DIR
 }
 
 function create_patch()
@@ -142,15 +142,15 @@ function create_patch()
 
     echo "Creating patch module..."
     if [ -z "$PRELINK" ]; then
-        ld -r -o "${PATCHNAME}.xsplice" --build-id=sha1 $(find output -type f -name "*.o") || die
-        chmod +x "${PATCHNAME}.xsplice"
+        ld -r -o "${PATCHNAME}.livepatch" --build-id=sha1 $(find output -type f -name "*.o") || die
+        chmod +x "${PATCHNAME}.livepatch"
     else
         ld -r -o output.o --build-id=sha1 $(find output -type f -name "*.o") || die
-        "${SCRIPTDIR}"/prelink $debugopt output.o "${PATCHNAME}.xsplice" "$XENSYMS" &>> "${OUTPUT}/prelink.log" || die
+        "${SCRIPTDIR}"/prelink $debugopt output.o "${PATCHNAME}.livepatch" "$XENSYMS" &>> "${OUTPUT}/prelink.log" || die
     fi
 
-    objcopy --add-section .xsplice.depends=depends.bin "${PATCHNAME}.xsplice"
-    objcopy --set-section-flags .xsplice.depends=alloc,readonly "${PATCHNAME}.xsplice"
+    objcopy --add-section .livepatch.depends=depends.bin "${PATCHNAME}.livepatch"
+    objcopy --set-section-flags .livepatch.depends=alloc,readonly "${PATCHNAME}.livepatch"
 }
 
 usage() {
@@ -247,7 +247,7 @@ OUTPUT="$(readlink -m -- "$outputarg")"
 
 PATCHNAME=$(make_patch_name "${PATCHFILE}")
 
-echo "Building xSplice patch: ${PATCHNAME}"
+echo "Building LivePatch patch: ${PATCHNAME}"
 echo
 echo "Xen directory: ${SRCDIR}"
 echo "Patch file: ${PATCHFILE}"
@@ -282,5 +282,5 @@ if [ "${SKIP}" != "diff" ]; then
 
     cd "${OUTPUT}" || die
     create_patch
-    echo "${PATCHNAME}.xsplice created successfully"
+    echo "${PATCHNAME}.livepatch created successfully"
 fi

@@ -860,7 +860,7 @@ static void kpatch_mark_ignored_functions_same(struct kpatch_elf *kelf)
 	struct section *sec;
 	struct rela *rela;
 
-	sec = find_section_by_name(&kelf->sections, ".xsplice.ignore.functions");
+	sec = find_section_by_name(&kelf->sections, ".livepatch.ignore.functions");
 	if (!sec)
 		return;
 
@@ -887,7 +887,7 @@ static void kpatch_mark_ignored_sections(struct kpatch_elf *kelf)
 	struct rela *rela;
 	char *name;
 
-	sec = find_section_by_name(&kelf->sections, ".xsplice.ignore.sections");
+	sec = find_section_by_name(&kelf->sections, ".livepatch.ignore.sections");
 	if (!sec)
 		return;
 
@@ -1297,10 +1297,10 @@ static void kpatch_include_hook_elements(struct kpatch_elf *kelf)
 
 	/* include load/unload sections */
 	list_for_each_entry(sec, &kelf->sections, list) {
-		if (!strcmp(sec->name, ".xsplice.hooks.load") ||
-		    !strcmp(sec->name, ".xsplice.hooks.unload") ||
-		    !strcmp(sec->name, ".rela.xsplice.hooks.load") ||
-		    !strcmp(sec->name, ".rela.xsplice.hooks.unload")) {
+		if (!strcmp(sec->name, ".livepatch.hooks.load") ||
+		    !strcmp(sec->name, ".livepatch.hooks.unload") ||
+		    !strcmp(sec->name, ".rela.livepatch.hooks.load") ||
+		    !strcmp(sec->name, ".rela.livepatch.hooks.unload")) {
 			sec->include = 1;
 			if (is_rela_section(sec)) {
 				/* include hook dependencies */
@@ -1325,8 +1325,8 @@ static void kpatch_include_hook_elements(struct kpatch_elf *kelf)
 	 * used by the kpatch_[load|unload]() macros.
 	 */
 	list_for_each_entry(sym, &kelf->symbols, list)
-		if (!strcmp(sym->name, "xsplice_load_data") ||
-		    !strcmp(sym->name, "xsplice_unload_data"))
+		if (!strcmp(sym->name, "livepatch_load_data") ||
+		    !strcmp(sym->name, "livepatch_unload_data"))
 			sym->include = 0;
 }
 
@@ -1469,7 +1469,7 @@ static void kpatch_create_strings_elements(struct kpatch_elf *kelf)
 
 	/* allocate section resources */
 	ALLOC_LINK(sec, &kelf->sections);
-	sec->name = ".xsplice.strings";
+	sec->name = ".livepatch.strings";
 
 	/* set data */
 	sec->data = malloc(sizeof(*sec->data));
@@ -1490,7 +1490,7 @@ static void kpatch_create_strings_elements(struct kpatch_elf *kelf)
 	sym->sym.st_info = GELF_ST_INFO(STB_LOCAL, STT_SECTION);
 	sym->type = STT_SECTION;
 	sym->bind = STB_LOCAL;
-	sym->name = ".xsplice.strings";
+	sym->name = ".livepatch.strings";
 }
 
 static void kpatch_build_strings_section_data(struct kpatch_elf *kelf)
@@ -1500,7 +1500,7 @@ static void kpatch_build_strings_section_data(struct kpatch_elf *kelf)
 	int size;
 	char *strtab;
 
-	sec = find_section_by_name(&kelf->sections, ".xsplice.strings");
+	sec = find_section_by_name(&kelf->sections, ".livepatch.strings");
 	if (!sec)
 		ERROR("can't find .kpatch.strings");
 
@@ -1560,7 +1560,7 @@ static char *mangle_local_symbol(char *filename, char *symname)
  * Rename local symbols to the filename#symbol format used by Xen's "special"
  * symbol table.
  */
-static void xsplice_rename_local_symbols(struct kpatch_elf *kelf, char *hint)
+static void livepatch_rename_local_symbols(struct kpatch_elf *kelf, char *hint)
 {
 	struct symbol *sym;
 
@@ -1638,7 +1638,7 @@ static struct section *create_section_pair(struct kpatch_elf *kelf,
 	return sec;
 }
 
-static void xsplice_create_patches_sections(struct kpatch_elf *kelf,
+static void livepatch_create_patches_sections(struct kpatch_elf *kelf,
 					    struct lookup_table *table,
 					    char *hint, int resolve)
 {
@@ -1647,7 +1647,7 @@ static void xsplice_create_patches_sections(struct kpatch_elf *kelf,
 	struct symbol *sym, *strsym;
 	struct rela *rela;
 	struct lookup_result result;
-	struct xsplice_patch_func *funcs;
+	struct livepatch_patch_func *funcs;
 	char *funcname;
 
 	/* count patched functions */
@@ -1657,14 +1657,14 @@ static void xsplice_create_patches_sections(struct kpatch_elf *kelf,
 			nr++;
 
 	/* create text/rela section pair */
-	sec = create_section_pair(kelf, ".xsplice.funcs", sizeof(*funcs), nr);
+	sec = create_section_pair(kelf, ".livepatch.funcs", sizeof(*funcs), nr);
 	relasec = sec->rela;
 	funcs = sec->data->d_buf;
 
 	/* lookup strings symbol */
-	strsym = find_symbol_by_name(&kelf->symbols, ".xsplice.strings");
+	strsym = find_symbol_by_name(&kelf->symbols, ".livepatch.strings");
 	if (!strsym)
-		ERROR("can't find .xsplice.strings symbol");
+		ERROR("can't find .livepatch.strings symbol");
 
 	/* populate sections */
 	index = 0;
@@ -1713,7 +1713,7 @@ static void xsplice_create_patches_sections(struct kpatch_elf *kelf,
 			rela->addend = 0;
 			rela->offset = index * sizeof(*funcs);
 			rela->offset = index * sizeof(*funcs) +
-			               offsetof(struct xsplice_patch_func, new_addr);
+			               offsetof(struct livepatch_patch_func, new_addr);
 
 			/*
 			 * Add a relocation that will populate
@@ -1724,7 +1724,7 @@ static void xsplice_create_patches_sections(struct kpatch_elf *kelf,
 			rela->type = R_X86_64_64;
 			rela->addend = offset_of_string(&kelf->strings, funcname);
 			rela->offset = index * sizeof(*funcs) +
-			               offsetof(struct xsplice_patch_func, name);
+			               offsetof(struct livepatch_patch_func, name);
 
 			index++;
 		}
@@ -1965,12 +1965,12 @@ int main(int argc, char *argv[])
 	log_debug("Create strings elements\n");
 	kpatch_create_strings_elements(kelf_out);
 	log_debug("Create patches sections\n");
-	xsplice_create_patches_sections(kelf_out, lookup, hint,
+	livepatch_create_patches_sections(kelf_out, lookup, hint,
 			                arguments.resolve);
 	kpatch_build_strings_section_data(kelf_out);
 
 	log_debug("Rename local symbols\n");
-	xsplice_rename_local_symbols(kelf_out, hint);
+	livepatch_rename_local_symbols(kelf_out, hint);
 
 	/*
 	 *  At this point, the set of output sections and symbols is
