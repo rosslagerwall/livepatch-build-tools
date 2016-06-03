@@ -40,14 +40,14 @@ $ ls -lh out/xsa106.livepatch
 
 Project Status
 --------------
-This is prototype code:
- * There's no way to apply built patches
- * Patches cannot be built for some source patches
- * The output format does not correspond to the latest LivePatch design
+Live patches can be built and applied for most XSAs; however, there are
+still some cases which require changing the source patch to support
+being built as a live patch.
 
-With no source patch modifications, live patches can be built for every
-XSA that applies to x86 back to XSA-90 except for XSA-97, XSA-111,
-XSA-112, and XSA-114 (83% success rate).
+This tool currently supports x86 only.
+
+It is intended that some or all of this project will merge back into
+kpatch-build rather being maintained as a fork.
 
 License
 -------
