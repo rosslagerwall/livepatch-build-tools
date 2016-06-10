@@ -257,23 +257,22 @@ echo
 
 if [ "${SKIP}" != "build" ]; then
     [ -e "${OUTPUT}" ] && die "Output directory exists"
-    mkdir -p "${OUTPUT}" || die
-
-    echo "Testing patch file..."
     cd "$SRCDIR" || die
-    patch -s -N -p1 --dry-run < "$PATCHFILE" || die "source patch file failed to apply"
+    patch -s -N -p1 -f --fuzz=0 --dry-run < "$PATCHFILE" || die "Source patch file failed to apply"
+
+    mkdir -p "${OUTPUT}" || die
 
     echo "Perform full initial build with ${CPUS} CPU(s)..."
     build_full
 
     echo "Apply patch and build with ${CPUS} CPU(s)..."
     cd "$SRCDIR" || die
-    patch -s -N -p1 < "$PATCHFILE" || die
+    patch -s -N -p1 -f --fuzz=0 < "$PATCHFILE" || die
     build_special patched
 
     echo "Unapply patch and build with ${CPUS} CPU(s)..."
     cd "$SRCDIR" || die
-    patch -s -R -p1 < "$PATCHFILE" || die
+    patch -s -R -p1 -f --fuzz=0 < "$PATCHFILE" || die
     build_special original
 fi
 
