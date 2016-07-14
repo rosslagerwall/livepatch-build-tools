@@ -160,6 +160,7 @@ usage() {
     echo "        -h, --help         Show this help message" >&2
     echo "        -s, --srcdir       Xen source directory" >&2
     echo "        -p, --patch        Patch file" >&2
+    echo "        -c, --config       .config file" >&2
     echo "        -o, --output       Output directory" >&2
     echo "        -j, --cpus         Number of CPUs to use" >&2
     echo "        -k, --skip         Skip build or diff phase" >&2
@@ -170,7 +171,7 @@ usage() {
     echo "        --prelink          Prelink" >&2
 }
 
-options=$(getopt -o hs:p:o:j:k:d -l "help,srcdir:patch:output:cpus:,skip:,debug,xen-debug,xen-syms:,depends:,prelink" -- "$@") || die "getopt failed"
+options=$(getopt -o hs:p:c:o:j:k:d -l "help,srcdir:patch:config:output:cpus:,skip:,debug,xen-debug,xen-syms:,depends:,prelink" -- "$@") || die "getopt failed"
 
 eval set -- "$options"
 
@@ -208,6 +209,11 @@ while [[ $# -gt 0 ]]; do
             patcharg="$1"
             shift
             ;;
+        -c|--config)
+            shift
+            configarg="$1"
+            shift
+            ;;
         -o|--output)
             shift
             outputarg="$1"
@@ -237,15 +243,18 @@ done
 
 [ -z "$srcarg" ] && die "Xen directory not given"
 [ -z "$patcharg" ] && die "Patchfile not given"
+[ -z "$configarg" ] && die ".config not given"
 [ -z "$outputarg" ] && die "Output directory not given"
 [ -z "$DEPENDS" ] && die "Build-id dependency not given"
 
 SRCDIR="$(readlink -m -- "$srcarg")"
 PATCHFILE="$(readlink -m -- "$patcharg")"
+CONFIGFILE="$(readlink -m -- "$configarg")"
 OUTPUT="$(readlink -m -- "$outputarg")"
 
 [ -d "${SRCDIR}" ] || die "Xen directory does not exist"
 [ -f "${PATCHFILE}" ] || die "Patchfile does not exist"
+[ -f "${CONFIGFILE}" ] || die ".config does not exist"
 
 PATCHNAME=$(make_patch_name "${PATCHFILE}")
 
@@ -253,16 +262,20 @@ echo "Building LivePatch patch: ${PATCHNAME}"
 echo
 echo "Xen directory: ${SRCDIR}"
 echo "Patch file: ${PATCHFILE}"
+echo ".config file: ${CONFIGFILE}"
 echo "Output directory: ${OUTPUT}"
 echo "================================================"
 echo
 
 if [ "${SKIP}" != "build" ]; then
     [ -e "${OUTPUT}" ] && die "Output directory exists"
+    grep -q 'CONFIG_LIVEPATCH=y' "${CONFIGFILE}" || die "CONFIG_LIVEPATCH must be enabled"
     cd "$SRCDIR" || die
     patch -s -N -p1 -f --fuzz=0 --dry-run < "$PATCHFILE" || die "Source patch file failed to apply"
 
     mkdir -p "${OUTPUT}" || die
+    cp -f "${CONFIGFILE}" "${OUTPUT}/.config"
+    cp -f "${OUTPUT}/.config" "xen/.config"
 
     echo "Perform full initial build with ${CPUS} CPU(s)..."
     build_full
