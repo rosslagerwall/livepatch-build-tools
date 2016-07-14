@@ -1,5 +1,9 @@
 SHELL = /bin/sh
 CC    = gcc
+INSTALL = install
+PREFIX ?= /usr/local
+BINDIR = $(DESTDIR)$(PREFIX)/bin
+LIBEXECDIR = $(DESTDIR)$(PREFIX)/libexec/livepatch-build-tools
 
 .PHONY: all install clean
 .DEFAULT: all
@@ -24,6 +28,12 @@ create-diff-object: $(CREATE_DIFF_OBJECT_OBJS)
 
 prelink: $(PRELINK_OBJS)
 	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
+
+install: all
+	$(INSTALL) -d $(LIBEXECDIR)
+	$(INSTALL) $(TARGETS) livepatch-gcc $(LIBEXECDIR)
+	$(INSTALL) -d $(BINDIR)
+	$(INSTALL) livepatch-build $(BINDIR)
 
 clean:
 	$(RM) $(TARGETS) $(CREATE_DIFF_OBJECT_OBJS) $(PRELINK_OBJS) *.d insn/*.d

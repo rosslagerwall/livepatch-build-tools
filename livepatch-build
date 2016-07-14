@@ -49,6 +49,18 @@ die() {
     exit 1
 }
 
+find_tools() {
+    if [[ -e "$SCRIPTDIR/create-diff-object" ]]; then
+        # Running from source tree
+        TOOLSDIR="$SCRIPTDIR"
+    elif [[ -e "$SCRIPTDIR/../libexec/livepatch-build-tools/create-diff-object" ]]; then
+        # Running installed
+        TOOLSDIR="$(readlink -f $SCRIPTDIR/../libexec/livepatch-build-tools)"
+    else
+        return 1
+    fi
+}
+
 function make_patch_name()
 {
     PATCHNAME=$(basename "$1")
@@ -78,7 +90,7 @@ function build_special()
     cd "${SRCDIR}" || die
 
     # Capture .o files from the patched build
-    export CROSS_COMPILE="${SCRIPTDIR}/livepatch-gcc "
+    export CROSS_COMPILE="${TOOLSDIR}/livepatch-gcc "
     export LIVEPATCH_BUILD_DIR="$(pwd)/"
     export LIVEPATCH_CAPTURE_DIR="$OUTPUT/${name}"
     mkdir -p "$LIVEPATCH_CAPTURE_DIR"
@@ -114,7 +126,7 @@ function create_patch()
         mkdir -p "output/$(dirname $i)" || die
         echo "Processing ${i}"
         echo "Run create-diff-object on $i" >> "${OUTPUT}/create-diff-object.log"
-        "${SCRIPTDIR}"/create-diff-object $debugopt $PRELINK "original/$i" "patched/$i" "$XENSYMS" "output/$i" &>> "${OUTPUT}/create-diff-object.log"
+        "${TOOLSDIR}"/create-diff-object $debugopt $PRELINK "original/$i" "patched/$i" "$XENSYMS" "output/$i" &>> "${OUTPUT}/create-diff-object.log"
         rc="${PIPESTATUS[0]}"
         if [[ $rc = 139 ]]; then
             warn "create-diff-object SIGSEGV"
@@ -148,7 +160,7 @@ function create_patch()
         chmod +x "${PATCHNAME}.livepatch"
     else
         ld -r -o output.o --build-id=sha1 $(find output -type f -name "*.o") || die
-        "${SCRIPTDIR}"/prelink $debugopt output.o "${PATCHNAME}.livepatch" "$XENSYMS" &>> "${OUTPUT}/prelink.log" || die
+        "${TOOLSDIR}"/prelink $debugopt output.o "${PATCHNAME}.livepatch" "$XENSYMS" &>> "${OUTPUT}/prelink.log" || die
     fi
 
     objcopy --add-section .livepatch.depends=depends.bin "${PATCHNAME}.livepatch"
@@ -170,6 +182,8 @@ usage() {
     echo "        --depends          Required build-id" >&2
     echo "        --prelink          Prelink" >&2
 }
+
+find_tools || die "can't find supporting tools"
 
 options=$(getopt -o hs:p:c:o:j:k:d -l "help,srcdir:patch:config:output:cpus:,skip:,debug,xen-debug,xen-syms:,depends:,prelink" -- "$@") || die "getopt failed"
 
