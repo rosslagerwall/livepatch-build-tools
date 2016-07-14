@@ -2,27 +2,34 @@ livepatch-build
 =============
 
 livepatch-build is a tool for building LivePatch patches from source code
-patches.  It takes as input, a Xen tree and a patch and outputs an
+patches.  It takes as input, a Xen tree and a patch and outputs a
 `.livepatch` module containing containing the live patch.
 
 Quick start
 -----------
 First checkout the code, and then run `make` to build it.
 
-Here is an example of building a patch for XSA-106:
+Here is an example of building a live patch for Xen for some XSA.
+First build Xen, install it on a host somewhere and reboot:
 ```
-$ cd ~/src/xen
-$ git reset --hard
-$ git clean -x -f -d
-$ git checkout 346d4545569928b652c40c7815c1732676f8587c^
-$ cd ~/src/livepatch-build
-$ wget -q 'http://xenbits.xen.org/xsa/xsa106.patch'
-$ ./livepatch-build --xen-debug -s ~/src/xen -p xsa106.patch -o out
-Building LivePatch patch: xsa106
+$ cp -r ~/src/xen ~/src/xenbuild
+$ cd ~/src/xen/xen
+$ make nconfig # Make sure to set CONFIG_LIVEPATCH=y
+$ make
+$ BUILDID=$(readelf -Wn xen-syms | awk '/Build ID:/ {print $3}')
+```
 
-Xen directory: /home/ross/src/xen
-Patch file: /home/ross/src/livepatch-build/xsa106.patch
-Output directory: /home/ross/src/livepatch-build/out
+Next, build a live patch, using a patch and the source, build ID, and
+.config from the original build:
+```
+$ cd ~/src/livepatch-build
+$ ./livepatch-build -s ~/src/xenbuild -p ~/src/xsa.patch -o out \
+    -c ~/src/xen/xen/.config --depends $BUILDID
+Building LivePatch patch: xsa
+
+Xen directory: /home/ross/src/xenbuild
+Patch file: /home/ross/src/xsa.patch
+Output directory: /home/ross/src/livepatch-build-tools/out
 ================================================
 
 Testing patch file...
@@ -32,22 +39,45 @@ Unapply patch and build with 4 CPU(s)...
 Extracting new and modified ELF sections...
 Processing xen/arch/x86/x86_emulate.o
 Creating patch module...
-xsa106.livepatch created successfully
+xsa.livepatch created successfully
 
-$ ls -lh out/xsa106.livepatch
--rw-rw-r--. 1 ross ross 418K Oct 12 12:02 out/xsa106.livepatch
+$ ls -lh out/xsa.livepatch
+-rwxrwxr-x. 1 ross ross 135K Jun 10 09:32 out/xsa.livepatch
+```
+
+Finally, copy the live patch to the host and load it:
+```
+$ scp out/xsa.livepatch myhost:
+$ ssh myhost 'xen-livepatch load xsa.livepatch'
+Uploading xsa.livepatch (135840 bytes)
+Performing apply:. completed
+$ ssh myhost 'xen-livepatch list'
+ ID                                     | status
+----------------------------------------+------------
+xsa                                     | APPLIED
 ```
 
 Project Status
 --------------
-This is prototype code:
- * There's no way to apply built patches
- * Patches cannot be built for some source patches
- * The output format does not correspond to the latest LivePatch design
+Live patches can be built and applied for many changes, including most
+XSAs; however, there are still some cases which require changing the
+source patch to allow it to be built as a live patch.
 
-With no source patch modifications, live patches can be built for every
-XSA that applies to x86 back to XSA-90 except for XSA-97, XSA-111,
-XSA-112, and XSA-114 (83% success rate).
+This tool currently supports x86 only.
+
+It is intended that some or all of this project will merge back into
+kpatch-build rather being maintained as a fork.
+
+Contributing
+------------
+Please send patches created with `git-format-patch` and an appropriate
+Signed-off-by: line to <xen-devel@lists.xen.org>, CCing the maintainers
+listed below.
+
+Maintainers
+-----------
+* Ross Lagerwall <ross.lagerwall@citrix.com>
+* Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
 
 License
 -------
