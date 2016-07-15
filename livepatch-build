@@ -66,7 +66,7 @@ function build_full()
 {
     cd "${SRCDIR}/xen" || die
     make "-j$CPUS" clean &> "${OUTPUT}/build_full_clean.log" || die
-    make "-j$CPUS" debug="$XEN_DEBUG" &> "${OUTPUT}/build_full_compile.log" || die
+    make "-j$CPUS" $XEN_DEBUG &> "${OUTPUT}/build_full_compile.log" || die
     cp xen-syms "$OUTPUT"
 }
 
@@ -87,7 +87,7 @@ function build_special()
     cd "${SRCDIR}/xen" || die
     sed -i 's/CFLAGS += -nostdinc/CFLAGS += -nostdinc -ffunction-sections -fdata-sections/' Rules.mk
     sed -i 's/--section-alignment=0x200000/--section-alignment=0x1000/' arch/x86/Makefile
-    make "-j$CPUS" debug="$XEN_DEBUG" &> "${OUTPUT}/build_${name}_compile.log" || die
+    make "-j$CPUS" $XEN_DEBUG &> "${OUTPUT}/build_${name}_compile.log" || die
     sed -i 's/CFLAGS += -nostdinc -ffunction-sections -fdata-sections/CFLAGS += -nostdinc/' Rules.mk
     sed -i 's/--section-alignment=0x1000/--section-alignment=0x200000/' arch/x86/Makefile
 
@@ -165,7 +165,7 @@ usage() {
     echo "        -j, --cpus         Number of CPUs to use" >&2
     echo "        -k, --skip         Skip build or diff phase" >&2
     echo "        -d, --debug        Enable debug logging" >&2
-    echo "        --xen-debug        Build debug Xen" >&2
+    echo "        --xen-debug        Build debug Xen (if your .config does not have the options)" >&2
     echo "        --xen-syms         Build against a xen-syms" >&2
     echo "        --depends          Required build-id" >&2
     echo "        --prelink          Prelink" >&2
@@ -276,6 +276,16 @@ if [ "${SKIP}" != "build" ]; then
     mkdir -p "${OUTPUT}" || die
     cp -f "${CONFIGFILE}" "${OUTPUT}/.config"
     cp -f "${OUTPUT}/.config" "xen/.config"
+
+    grep -q CONFIG_DEBUG "xen/.config"
+    if [ $? -eq 0 ]; then
+        if [ "$XEN_DEBUG" == "y" ]; then
+            grep -q "CONFIG_DEBUG=y" "xen/.config" || die "CONFIG_DEBUG and --xen-debug mismatch"
+        fi
+        XEN_DEBUG=""
+    else
+        XEN_DEBUG="debug=$XEN_DEBUG"
+    fi
 
     echo "Perform full initial build with ${CPUS} CPU(s)..."
     build_full
