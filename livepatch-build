@@ -98,10 +98,13 @@ function build_special()
     # Build with special GCC flags
     cd "${SRCDIR}/xen" || die
     sed -i 's/CFLAGS += -nostdinc/CFLAGS += -nostdinc -ffunction-sections -fdata-sections/' Rules.mk
+    cp -p arch/x86/Makefile arch/x86/Makefile.bak
     sed -i 's/--section-alignment=0x200000/--section-alignment=0x1000/' arch/x86/Makefile
+    # Restore timestamps to prevent spurious rebuilding
+    touch --reference=arch/x86/Makefile.bak arch/x86/Makefile
     make "-j$CPUS" $XEN_DEBUG &> "${OUTPUT}/build_${name}_compile.log" || die
     sed -i 's/CFLAGS += -nostdinc -ffunction-sections -fdata-sections/CFLAGS += -nostdinc/' Rules.mk
-    sed -i 's/--section-alignment=0x1000/--section-alignment=0x200000/' arch/x86/Makefile
+    mv -f arch/x86/Makefile.bak arch/x86/Makefile
 
     unset LIVEPATCH_BUILD_DIR
     unset LIVEPATCH_CAPTURE_DIR
