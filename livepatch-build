@@ -185,7 +185,7 @@ usage() {
 
 find_tools || die "can't find supporting tools"
 
-options=$(getopt -o hs:p:c:o:j:k:d -l "help,srcdir:patch:config:output:cpus:,skip:,debug,xen-debug,xen-syms:,depends:,prelink" -- "$@") || die "getopt failed"
+options=$(getopt -o hs:p:c:o:j:k:d -l "help,srcdir:,patch:,config:,output:,cpus:,skip:,debug,xen-debug,xen-syms:,depends:,prelink" -- "$@") || die "getopt failed"
 
 eval set -- "$options"
 
