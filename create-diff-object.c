@@ -1184,6 +1184,43 @@ static void kpatch_process_special_sections(struct kpatch_elf *kelf)
 	}
 }
 
+/* Returns true if s is a string of only numbers with length > 0. */
+static int isnumber(const char *s)
+{
+	do {
+		if (!*s || !isdigit(*s))
+			return 0;
+	} while (*++s);
+
+	return 1;
+}
+
+/*
+ * String sections are always included even if unchanged.
+ * The format is either:
+ * .rodata.<func>.str1.[0-9]+ (new in GCC 6.1.0)
+ * or .rodata.str1.[0-9]+ (older versions of GCC)
+ * For the new format we could be smarter and only include the needed
+ * strings sections.
+ */
+static int should_include_str_section(const char *name)
+{
+	const char *s;
+
+	if (strncmp(name, ".rodata.", 8))
+		return 0;
+
+	/* Check if name matches ".rodata.str1.[0-9]+" */
+	if (!strncmp(name, ".rodata.str1.", 13))
+		return isnumber(name + 13);
+
+	/* Check if name matches ".rodata.<func>.str1.[0-9]+" */
+	s = strstr(name, ".str1.");
+	if (!s)
+		return 0;
+	return isnumber(s + 6);
+}
+
 static void kpatch_include_standard_elements(struct kpatch_elf *kelf)
 {
 	struct section *sec;
@@ -1193,7 +1230,7 @@ static void kpatch_include_standard_elements(struct kpatch_elf *kelf)
 		if (!strcmp(sec->name, ".shstrtab") ||
 		    !strcmp(sec->name, ".strtab") ||
 		    !strcmp(sec->name, ".symtab") ||
-		    !strncmp(sec->name, ".rodata.str1.", 13)) {
+		    should_include_str_section(sec->name)) {
 			sec->include = 1;
 			if (sec->secsym)
 				sec->secsym->include = 1;
