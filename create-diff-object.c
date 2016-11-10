@@ -1057,6 +1057,32 @@ static int should_keep_rela_group(struct section *sec, int start, int size)
 	return found;
 }
 
+/*
+ * When updating .fixup, the corresponding addends in .ex_table need to be
+ * updated too. Stash the result in rela.r_addend so that the calculation in
+ * fixup_group_size() is not affected.
+ */
+void kpatch_update_ex_table_addend(struct kpatch_elf *kelf,
+				   struct special_section *special,
+				   int src_offset, int dest_offset)
+{
+	struct rela *rela;
+	struct section *sec;
+
+	if (strcmp(special->name, ".fixup"))
+		return;
+
+	sec = find_section_by_name(&kelf->sections, ".rela.ex_table");
+	if (!sec)
+		ERROR("missing .rela.ex_table section");
+
+	list_for_each_entry(rela, &sec->relas, list) {
+		if (!strcmp(rela->sym->name, ".fixup") &&
+		    rela->addend >= src_offset)
+			rela->rela.r_addend = rela->addend - (src_offset - dest_offset);
+	}
+}
+
 static void kpatch_regenerate_special_section(struct kpatch_elf *kelf,
 				              struct special_section *special,
 				              struct section *sec)
@@ -1072,6 +1098,14 @@ static void kpatch_regenerate_special_section(struct kpatch_elf *kelf,
 	dest = malloc(sec->base->sh.sh_size);
 	if (!dest)
 		ERROR("malloc");
+
+	/* Restore the stashed r_addend from kpatch_update_ex_table_addend. */
+	if (!strcmp(special->name, ".ex_table")) {
+		list_for_each_entry(rela, &sec->relas, list) {
+			if (!strcmp(rela->sym->name, ".fixup"))
+				rela->addend = rela->rela.r_addend;
+		}
+	}
 
 	group_size = 0;
 	src_offset = 0;
@@ -1100,6 +1134,10 @@ static void kpatch_regenerate_special_section(struct kpatch_elf *kelf,
 				rela->rela.r_offset = rela->offset;
 
 				rela->sym->include = 1;
+
+				kpatch_update_ex_table_addend(kelf, special,
+							      src_offset,
+							      dest_offset);
 			}
 		}
 
