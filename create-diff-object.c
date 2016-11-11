@@ -1064,7 +1064,8 @@ static int should_keep_rela_group(struct section *sec, int start, int size)
  */
 void kpatch_update_ex_table_addend(struct kpatch_elf *kelf,
 				   struct special_section *special,
-				   int src_offset, int dest_offset)
+				   int src_offset, int dest_offset,
+				   int group_size)
 {
 	struct rela *rela;
 	struct section *sec;
@@ -1078,7 +1079,8 @@ void kpatch_update_ex_table_addend(struct kpatch_elf *kelf,
 
 	list_for_each_entry(rela, &sec->relas, list) {
 		if (!strcmp(rela->sym->name, ".fixup") &&
-		    rela->addend >= src_offset)
+		    rela->addend >= src_offset &&
+		    rela->addend < src_offset + group_size)
 			rela->rela.r_addend = rela->addend - (src_offset - dest_offset);
 	}
 }
@@ -1137,7 +1139,8 @@ static void kpatch_regenerate_special_section(struct kpatch_elf *kelf,
 
 				kpatch_update_ex_table_addend(kelf, special,
 							      src_offset,
-							      dest_offset);
+							      dest_offset,
+							      group_size);
 			}
 		}
 
